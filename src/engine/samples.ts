@@ -57,7 +57,7 @@ export function sampleDesign(): Design {
   const items: PlacedItem[] = [
     item('L1', 'line_terminal', 2, 20, HV, { flow: 'in' }, 0, 'Line 1'),
     item('S1', 'switch', 6, 20.5, HV, {}, 0, 'Primary disconnect'),
-    item('F1', 'fuse', 10, 20.5, HV, { ampRating: 100, interruptingKA: 20 }, 0, 'T1 fuses'),
+    item('F1', 'fuse', 10, 20.5, HV, { ampRating: 125, interruptingKA: 20 }, 0, 'T1 fuses'),
     item('T1', 'transformer', 14, 20.5, HV, { kva: 10000, cooling: 'OA/FA', ltc: false, lvKV: LV, arresters: 'hv_lv' }, 0, 'T1'),
     item('RG1', 'regulator', 22, 21, LV, { ratedA: 668, rangePct: 10, bypass: true }, 0, 'Bus regulators'),
     // Feeder 1 bay
@@ -73,9 +73,10 @@ export function sampleDesign(): Design {
     item('FE2', 'feeder_exit', 41, 26.5, LV, { feeder: 'Feeder 2 — South' }, 0, 'Feeder 2'),
     item('HS2', 'hookstick_switch', 33.5, 31, LV, { normallyOpen: true }, 0, 'R2 bypass'),
     // Lightning masts and control house
-    item('M1', 'mast', 16.5, 12.5, 0, { heightM: 18 }),
-    item('M2', 'mast', 34, 22.5, 0, { heightM: 18 }),
-    item('M3', 'mast', 16.5, 31, 0, { heightM: 18 }),
+    item('M1', 'mast', 10, 19, 0, { heightM: 20 }),
+    item('M2', 'mast', 32, 13, 0, { heightM: 20 }),
+    item('M3', 'mast', 33, 23, 0, { heightM: 20 }),
+    item('M4', 'mast', 31, 29, 0, { heightM: 20 }),
     item('CH1', 'control_house', 6, 30, 0, { size: 'small' }),
   ];
   const conductors: Conductor[] = [
