@@ -6,6 +6,31 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-21
+
+### Added
+- 3D view of the substation (Tab) with Low/Medium/High graphics presets: renders only when something
+  changes, honours the frame-rate cap, scales shadows, model detail, scenery, resolution and
+  anti-aliasing. Low is about 13x lighter than High. Falls back to the plan view without WebGL; the
+  desktop build keeps software WebGL when hardware acceleration is off.
+- Ground grid design and safety evaluation following Chapter 9 (the IEEE Std 80 method): surface
+  layer and Cs (Table 9-4, 3000 ohm-m minimum), tolerable touch/step voltage (50 kg), grid resistance,
+  IG = Df x Sf x 3I0, GPR, mesh and step voltage, conductor sizing (Eq. 9-11), fence bonding and the
+  3 ft perimeter rule.
+- Protective relaying checks (Chapter 12): feeder, line, bus-tie and transformer relays, and the
+  fuse-versus-relay transformer size guidance (section 12.4.4.1).
+- Projects 4-6: *Mobile Ready* (mobile transformer provisions, removal routes, 24.9 kV),
+  *Growing Pains* (two transformers, sectionalized bus with tie breaker, N-1, expansion space) and
+  *Touch and Step* (ground grid design).
+- Field Guide articles on grounding, relaying, arresters, reclosers, instrument transformers, site
+  design, auxiliary systems, automation and communications, maintenance, and each bus scheme.
+- Cited data for Chapters 6, 9, 12, 14-21 and sections 5.8-5.11.
+
+### Changed
+- Transformer impedances from Table 5-11 and fan-cooled ratings from section 5.2.2; regulator
+  capability from Table 5-28; the bulletin's 1890 A figure for 3 in. aluminum pipe bus.
+- Planned maintenance in the simulation follows its schedule instead of occurring at random.
+
 ## [0.1.0] - 2026-11-21
 
 First playable release.

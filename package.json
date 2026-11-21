@@ -1,7 +1,7 @@
 {
   "name": "substation-designer",
   "productName": "Substation Designer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A rural substation design game grounded in USDA RUS Bulletin 1724E-300, Design Guide for Rural Substations.",
   "license": "PolyForm-Noncommercial-1.0.0",
   "author": "geographybuff",

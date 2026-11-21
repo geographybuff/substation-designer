@@ -12,6 +12,15 @@ import { BREAKER_APPLICATION_GUIDANCE, BREAKER_CONSTRUCTION_FACTS, TABLE_5_23_OU
 import { CAPACITOR_SYSTEM_GUIDANCE, GROUNDING_SAFETY_GUIDANCE, PROTECTION_GUIDANCE as CAPACITOR_PROTECTION_GUIDANCE } from '../data/bulletin/capacitors';
 import { ALTITUDE_GUIDANCE, OTHER_ENVIRONMENT_GUIDANCE, PLANNING_GUIDANCE, PUBLIC_SAFETY_GUIDANCE, SEISMIC_GUIDANCE, SITE_GUIDANCE, TABLE_2_2_ALTITUDE_CORRECTION, WEATHER_GUIDANCE } from '../data/bulletin/environment';
 import { APPARATUS_INSULATOR_GUIDANCE, CONDUCTOR_GUIDANCE, BUS_CONNECTION_GUIDANCE } from '../data/bulletin/insulatorsConductors';
+import { CONDUCTOR_GUIDANCE as GROUND_CONDUCTOR_GUIDANCE, DESIGN_PROCEDURE_STEPS, FAULT_CURRENT_GUIDANCE, GENERAL_GROUNDING_GUIDANCE, GRID_AREA_GUIDANCE, SAFETY_GUIDANCE, SOIL_GUIDANCE, SPECIAL_DANGER_POINTS, SPLIT_FACTOR_GUIDANCE, TRANSFERRED_VOLTAGE_GUIDANCE, VOLTAGE_CALC_GUIDANCE, TABLE_9_4_SURFACE_MATERIALS, TABLE_9_4_CITE } from '../data/bulletin/grounding';
+import { COORDINATION_GUIDANCE, RECLOSING_GUIDANCE, RELAY_SELECTION_GUIDANCE, RELAYING_FUNDAMENTALS, RELAYING_PURPOSE, TRANSFORMER_PROTECTION_GUIDANCE as XFMR_RELAY_GUIDANCE, TRANSMISSION_LINE_GUIDANCE as LINE_RELAY_GUIDANCE, DEVICE_FUNCTION_NUMBERS, DEVICE_FUNCTION_NUMBERS_CITE } from '../data/bulletin/relaying';
+import { DRAINAGE_GUIDANCE, EARTHWORK_GUIDANCE, EROSION_GUIDANCE, FENCE_GUIDANCE, OIL_GUIDANCE, ROAD_GUIDANCE, SITE_GENERAL_GUIDANCE, SURFACING_GUIDANCE } from '../data/bulletin/site';
+import { APPLICATION_GUIDANCE as ARRESTER_APPLICATION, ARRESTER_GENERAL_GUIDANCE, LOCATION_GUIDANCE as ARRESTER_LOCATION, SIC_VS_MOV } from '../data/bulletin/arresters';
+import { RECLOSER_GUIDANCE, RECLOSER_MAINTENANCE, RECLOSER_OPERATION_GUIDANCE } from '../data/bulletin/reclosers';
+import { AC_AUX_GUIDANCE, CONTROL_HOUSE_GUIDANCE, DC_AUX_GUIDANCE } from '../data/bulletin/auxiliary';
+import { CC_CCVT_GUIDANCE, CT_GUIDANCE, IT_GENERAL_GUIDANCE, VT_GUIDANCE } from '../data/bulletin/instrumentTransformers';
+import { INSPECTION_GUIDANCE, MAINTENANCE_GUIDANCE, RCM_GUIDANCE, UPRATING_GUIDANCE } from '../data/bulletin/maintenance';
+import { AUTOMATION_GUIDANCE, COMM_DESIGN_RULES, PROTOCOL_GUIDANCE } from '../data/bulletin/communications';
 import type { Block, GuideArticle } from './guide';
 
 const cite = (g: Guidance) => formatCitation(g.cite, true);
@@ -234,4 +243,65 @@ export const DATA_ARTICLES: GuideArticle[] = [
     [],
     ['insulator', 'conductor', 'ampacity'],
   ),
+  guidanceArticle(
+    'grounding',
+    'Substation grounding',
+    'Grounding',
+    'The ground grid limits the potential differences a person can be exposed to during a ground fault. The game evaluates it with the Chapter 9 procedure: tolerable touch and step voltages for a 50 kg person, the surface-layer factor Cs, grid resistance, maximum grid current IG = Df·Sf·3I0, ground potential rise, and mesh and step voltages.',
+    [
+      ['General', GENERAL_GROUNDING_GUIDANCE],
+      ['Soil and grid area', [...SOIL_GUIDANCE, ...GRID_AREA_GUIDANCE]],
+      ['Fault current and split factor', [...FAULT_CURRENT_GUIDANCE, ...SPLIT_FACTOR_GUIDANCE]],
+      ['Conductors', GROUND_CONDUCTOR_GUIDANCE],
+      ['Safety criteria', SAFETY_GUIDANCE],
+      ['Design procedure', DESIGN_PROCEDURE_STEPS],
+      ['Calculating voltages', VOLTAGE_CALC_GUIDANCE],
+      ['Special danger points', SPECIAL_DANGER_POINTS],
+      ['Transferred voltage', TRANSFERRED_VOLTAGE_GUIDANCE],
+    ],
+    [
+      {
+        table: {
+          head: ['Surface material', 'Wet resistivity (Ω·m)'],
+          rows: TABLE_9_4_SURFACE_MATERIALS.map((r) => [r.description, r.wetOhmM ? (r.wetOhmM[0] === r.wetOhmM[1] ? r.wetOhmM[0] : `${r.wetOhmM[0]}–${r.wetOhmM[1]}`) : '—']),
+          caption: 'In the game: crushed rock uses row 3, washed granite row 5, asphalt the row 10 lower bound — all meeting the 3000 Ω·m minimum of §9.10.2 step 7.',
+          cite: TABLE_9_4_CITE,
+        },
+      },
+    ],
+    ['grounding', 'touch', 'step', 'mesh', 'gpr', 'crushed rock'],
+  ),
+  guidanceArticle(
+    'relaying',
+    'Protective relaying',
+    'Protection',
+    'Protective relays detect faults and abnormal conditions and trip the right breakers quickly and selectively.',
+    [
+      ['Purpose', RELAYING_PURPOSE],
+      ['Fundamentals', RELAYING_FUNDAMENTALS],
+      ['Relay selection', RELAY_SELECTION_GUIDANCE],
+      ['Transmission lines', LINE_RELAY_GUIDANCE],
+      ['Transformers', XFMR_RELAY_GUIDANCE],
+      ['Reclosing', RECLOSING_GUIDANCE],
+      ['Coordination', COORDINATION_GUIDANCE],
+    ],
+    [
+      {
+        table: {
+          head: ['Device', 'Function'],
+          rows: DEVICE_FUNCTION_NUMBERS.filter((d) => ['21', '25', '27', '50', '51', '52', '59', '63', '67', '79', '81', '85', '86', '87', '89', '94'].includes(String(d.number))).map((d) => [d.number, d.name]),
+          caption: 'Common standard device function numbers (Appendix F).',
+          cite: DEVICE_FUNCTION_NUMBERS_CITE,
+        },
+      },
+    ],
+    ['relay', '50/51', '87', '21', 'reclosing', 'device number'],
+  ),
+  guidanceArticle('arresters-detail', 'Surge arrester application', 'Lightning', 'Choosing and locating surge arresters.', [[null, ARRESTER_GENERAL_GUIDANCE], ['Silicon carbide vs metal oxide', SIC_VS_MOV], ['Application', ARRESTER_APPLICATION], ['Location', ARRESTER_LOCATION]], [], ['arrester', 'mcov', 'mov']),
+  guidanceArticle('reclosers', 'Automatic circuit reclosers', 'Equipment', 'Reclosers clear temporary faults automatically and lock out on permanent ones.', [[null, RECLOSER_GUIDANCE], ['Operation', RECLOSER_OPERATION_GUIDANCE], ['Maintenance', RECLOSER_MAINTENANCE]], [], ['recloser', 'reclosing']),
+  guidanceArticle('instrument-transformers', 'Instrument transformers', 'Equipment', 'Current and voltage transformers feed relays and meters.', [[null, IT_GENERAL_GUIDANCE], ['Current transformers', CT_GUIDANCE], ['Voltage transformers', VT_GUIDANCE], ['Coupling capacitors and CCVTs', CC_CCVT_GUIDANCE]], [], ['ct', 'vt', 'ccvt']),
+  guidanceArticle('site-design', 'Site design: drainage, roads, surfacing, fence', 'Site', 'Civil design of the substation site.', [[null, SITE_GENERAL_GUIDANCE], ['Drainage', DRAINAGE_GUIDANCE], ['Earthwork', EARTHWORK_GUIDANCE], ['Roads', ROAD_GUIDANCE], ['Erosion', EROSION_GUIDANCE], ['Yard surfacing', SURFACING_GUIDANCE], ['Security fence', FENCE_GUIDANCE], ['Oil containment', OIL_GUIDANCE]], [], ['site', 'fence', 'drainage', 'oil']),
+  guidanceArticle('auxiliary', 'AC and DC auxiliary systems, control house', 'Systems', 'Station service, the station battery and the control house that holds relays and controls.', [['AC auxiliary system', AC_AUX_GUIDANCE], ['DC auxiliary system', DC_AUX_GUIDANCE], ['Control house', CONTROL_HOUSE_GUIDANCE]], [], ['battery', 'station service', 'control house']),
+  guidanceArticle('automation-comms', 'Automation and communications', 'Systems', 'SCADA, substation automation and the channels that carry relaying and data.', [['Automation', AUTOMATION_GUIDANCE], ['Protocols', PROTOCOL_GUIDANCE], ['Communications design', COMM_DESIGN_RULES]], [], ['scada', 'fiber', 'carrier']),
+  guidanceArticle('maintenance', 'Inspection, maintenance and uprating', 'Systems', 'Keeping a substation in service and expanding it later.', [['Inspection', INSPECTION_GUIDANCE], ['Maintenance', MAINTENANCE_GUIDANCE], ['Reliability-centered maintenance', RCM_GUIDANCE], ['Uprating and expansion', UPRATING_GUIDANCE]], [], ['maintenance', 'inspection', 'uprating']),
 ];

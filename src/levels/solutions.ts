@@ -83,6 +83,37 @@ function verticalFeederBay(n: number, cx: number, busY: number, feeder: string, 
   return { items, conductors };
 }
 
+function l3Layout(d: Design): void {
+      const HV = 69;
+      const LV = 12.47;
+      d.items.push(
+        it('S1', 'switch', 5, 18.5, HV, {}, 0, 'Primary disconnect'),
+        it('F1', 'fuse', 9.5, 18.5, HV, { ampRating: 100, interruptingKA: 20 }, 0, 'T1 fuses'),
+        it('T1', 'transformer', 14, 18.5, HV, { kva: 7500, cooling: 'OA/FA', lvKV: LV, arresters: 'hv_lv' }, 0, 'T1'),
+        it('RG1', 'regulator', 22, 19, LV, { ratedA: 438, rangePct: 10, bypass: true, arresters: true }, 0, 'Bus regulators'),
+        it('LA1', 'arrester', 2.5, 25.5, HV, { class: 'station' }, 1, 'Line entrance arresters'),
+        it('LA2', 'arrester', 6.5, 25.5, HV, { class: 'station' }, 1, 'T1 arresters (line side of fuses)'),
+      );
+      d.conductors.push(
+        bus('H1', HV, [2.5, 21], [5, 21]),
+        bus('H1t', HV, [4.5, 21], [4.5, 25.5]),
+        bus('H2', HV, [7.5, 21], [9.5, 21]),
+        bus('H2t', HV, [8.5, 21], [8.5, 25.5]),
+        bus('H3', HV, [12, 21], [14, 21]),
+        bus('L1', LV, [20, 21], [22, 21]),
+        bus('L2', LV, [24.5, 21], [27, 21]),
+        bus('LB', LV, [27, 12], [27, 30]),
+      );
+      const names = ['Feeder 1 — Buffalo Flats', 'Feeder 2 — Stony Creek'];
+      [16, 30].forEach((y, i) => {
+        const b = feederBay(i + 1, y, names[i]!, { busX: 27, x0: 29, bypass: true, recloser: { continuousA: 400, interruptingKA: 6 } });
+        d.items.push(...b.items);
+        d.conductors.push(...b.conductors);
+      });
+      d.items.push(...L3_MASTS.map(([x, y, h], i) => it(`M${i + 1}`, 'mast', x, y, 0, { heightM: h })));
+      d.fence = { rect: { x: 0.5, y: 8.5, w: 44.5, h: 28 }, gate: { side: 'S', offset: 18, width: 6 } };
+}
+
 function withLevel(levelId: string, build: (d: Design) => void): Design {
   const d = newDesign(getLevel(levelId)!);
   build(d);
@@ -134,36 +165,12 @@ export const SOLUTIONS: Record<string, () => Design> = {
       d.fence = { rect: { x: 0.5, y: 6.5, w: 44.5, h: 31.5 }, gate: { side: 'E', offset: 2, width: 6 } };
     }),
 
-  'l3-thunderstorm-alley': () =>
-    withLevel('l3-thunderstorm-alley', (d) => {
-      const HV = 69;
-      const LV = 12.47;
-      d.items.push(
-        it('S1', 'switch', 5, 18.5, HV, {}, 0, 'Primary disconnect'),
-        it('F1', 'fuse', 9.5, 18.5, HV, { ampRating: 100, interruptingKA: 20 }, 0, 'T1 fuses'),
-        it('T1', 'transformer', 14, 18.5, HV, { kva: 7500, cooling: 'OA/FA', lvKV: LV, arresters: 'hv_lv' }, 0, 'T1'),
-        it('RG1', 'regulator', 22, 19, LV, { ratedA: 438, rangePct: 10, bypass: true, arresters: true }, 0, 'Bus regulators'),
-        it('LA1', 'arrester', 2.5, 25.5, HV, { class: 'station' }, 1, 'Line entrance arresters'),
-        it('LA2', 'arrester', 6.5, 25.5, HV, { class: 'station' }, 1, 'T1 arresters (line side of fuses)'),
-      );
-      d.conductors.push(
-        bus('H1', HV, [2.5, 21], [5, 21]),
-        bus('H1t', HV, [4.5, 21], [4.5, 25.5]),
-        bus('H2', HV, [7.5, 21], [9.5, 21]),
-        bus('H2t', HV, [8.5, 21], [8.5, 25.5]),
-        bus('H3', HV, [12, 21], [14, 21]),
-        bus('L1', LV, [20, 21], [22, 21]),
-        bus('L2', LV, [24.5, 21], [27, 21]),
-        bus('LB', LV, [27, 12], [27, 30]),
-      );
-      const names = ['Feeder 1 — Buffalo Flats', 'Feeder 2 — Stony Creek'];
-      [16, 30].forEach((y, i) => {
-        const b = feederBay(i + 1, y, names[i]!, { busX: 27, x0: 29, bypass: true, recloser: { continuousA: 400, interruptingKA: 6 } });
-        d.items.push(...b.items);
-        d.conductors.push(...b.conductors);
-      });
-      d.items.push(...L3_MASTS.map(([x, y, h], i) => it(`M${i + 1}`, 'mast', x, y, 0, { heightM: h })));
-      d.fence = { rect: { x: 0.5, y: 8.5, w: 44.5, h: 28 }, gate: { side: 'S', offset: 18, width: 6 } };
+  'l3-thunderstorm-alley': () => withLevel('l3-thunderstorm-alley', l3Layout),
+  'l6-touch-and-step': () =>
+    withLevel('l6-touch-and-step', (d) => {
+      l3Layout(d);
+      d.groundGrid = { ...d.groundGrid, ...L6_GRID };
+      d.surfacing = { ...L6_SURFACING };
     }),
 
   'l4-mobile-ready': () =>
@@ -248,6 +255,10 @@ export const SOLUTIONS: Record<string, () => Design> = {
       d.fence = { rect: { x: 0.5, y: 5, w: 69.5, h: 42 }, gate: { side: 'N', offset: 16, width: 6 } };
     }),
 };
+
+/** Ground grid and surfacing for the L6 solution (cheapest safe option from a parameter sweep). */
+export const L6_GRID = { enabled: true, spacingM: 3, conductor: '4/0' as const, depthM: 0.5, rodCount: 20, rodLengthM: 3, extendBeyondFenceM: 1.25, fenceBonded: true };
+export const L6_SURFACING = { material: 'crushed_rock' as const, thicknessM: 0.1 };
 
 /** Mast positions for the L4 and L5 solutions (greedy coverage search). */
 export const L4_MASTS: Array<[number, number, number]> = [[39, 19.5, 20], [40.5, 30, 20], [12, 24, 20], [12, 13.5, 20], [39, 9, 20], [1.5, 27, 20], [39, 34.5, 20]];

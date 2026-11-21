@@ -347,6 +347,41 @@ export const L5_GROWING_PAINS: LevelDef = {
   reliabilityTarget: 40,
 };
 
+export const L6_TOUCH_AND_STEP: LevelDef = {
+  ...L3_THUNDERSTORM_ALLEY,
+  id: 'l6-touch-and-step',
+  order: 6,
+  title: 'Touch and Step',
+  subtitle: 'Designing a safe ground grid',
+  client: 'High Plains Electric Cooperative',
+  briefing: [
+    'High Plains is building on dry, rocky ground with high soil resistivity, and the supply system can deliver a heavy ground fault. During a fault the whole yard rises in potential; people inside must never be exposed to more than the tolerable touch and step voltages.',
+    'Design the ground grid: choose mesh spacing, conductor size, burial depth and ground rods, extend the perimeter conductor outside the fence and bond the fence, and add a high-resistivity surface layer. The Review panel shows mesh voltage against the tolerable touch voltage as you work.',
+  ],
+  topics: [
+    { text: 'Tolerable touch and step voltages (Eqs. 9-16 to 9-19)', cite: { page: [540, 545], section: '9.8' } },
+    { text: 'Protective surface material and Cs (Table 9-4)', cite: { page: [545, 547], section: '9.9' } },
+    { text: 'Design procedure, mesh and step voltage', cite: { page: [548, 554], section: '9.10' } },
+    { text: 'Fence grounding and special danger points', cite: { page: [557, 560], section: '9.10.10' } },
+  ],
+  site: { width: 60, depth: 46, altitudeM: 980, soilResistivity: 250, isokeraunicDays: 45, roadSide: 'S', notes: ['Dry, rocky soil: uniform resistivity about 250 Ω·m.', 'Ground fault current at the 69 kV bus is high.'] },
+  system: { ...L3_THUNDERSTORM_ALLEY.system, hvFaultKA: 9, hvGroundFaultKA: 6, xOverR: 12, splitFactor: 0.6, faultDurationS: 0.5 },
+  fixtures: [fixture('L1', 'line_terminal', 1, 18, 69, 'Line from Sage Butte', { flow: 'in' })],
+  features: { fence: true, groundGrid: true, shieldWires: true, surfacing: true },
+  checksOff: ['aux.', 'layout.removal'],
+  budget: 1_250_000,
+  objectives: [
+    { id: 'o1', kind: 'feeders_served', text: 'Serve both feeders' },
+    { id: 'o2', kind: 'feeder_protection', text: 'Protect each feeder', cite: { page: 122, section: '4.3.1' } },
+    { id: 'o3', kind: 'transformer_protection', text: 'Protect the transformer primary', cite: { page: 122, section: '4.3.2' } },
+    { id: 'o4', kind: 'grounding_safe', text: 'Keep touch and step voltages below tolerable limits', cite: { page: [548, 554], section: '9.10' } },
+    { id: 'o5', kind: 'voltage_regulation', text: 'Regulate feeder voltage', cite: { page: 122, section: '4.3.3' } },
+    { id: 'o6', kind: 'shielding', text: 'Shield all energized equipment', optional: true, cite: { page: 143, section: '4.7.3.4.1' } },
+    { id: 'o7', kind: 'fence', text: 'Fence the yard with proper safety clearance', cite: { page: 158, figure: '4-21' } },
+  ],
+  tutorial: undefined,
+};
+
 export const SANDBOX: LevelDef = {
   id: 'sandbox',
   order: 99,
