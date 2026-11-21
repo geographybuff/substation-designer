@@ -207,7 +207,7 @@ export function Editor() {
                   {stepComplete ? '✓ Done!' : 'Waiting for you…'}
                 </span>
               ) : (
-                <button class="btn small primary" onClick={() => store.set({ tutorialStep: tutorialStep + 1 })}>
+                <button class="btn small primary" onClick={() => store.set({ tutorialStep: tutorialStep + 1 })} data-testid="tutorial-next">
                   Next
                 </button>
               )}

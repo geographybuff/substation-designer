@@ -70,6 +70,10 @@ export class EditorController {
     this.view.resize();
     this.push();
     this.fitSite();
+    // Expose screen<->world mapping to the end-to-end test (only with ?e2e).
+    if (typeof window !== 'undefined' && window.location.search.includes('e2e')) {
+      (window as unknown as { __sdWorldToScreen?: (x: number, y: number) => Vec2 }).__sdWorldToScreen = (x, y) => this.view.worldToScreen({ x, y });
+    }
   }
 
   dispose(): void {

@@ -30,6 +30,8 @@ jobs:
         run: npm run e2e
       - name: End-to-end smoke test (single-file web build)
         run: npm run e2e:web
+      - name: Editor interaction test
+        run: npm run e2e:interaction
       - name: License enforcement checks
         run: |
           node scripts/prepare-build.mjs

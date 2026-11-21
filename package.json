@@ -27,7 +27,8 @@
     "verify:release": "node scripts/verify-release.mjs",
     "electron": "electron .",
     "dist:win": "vite build && node scripts/prepare-build.mjs && electron-builder --win --x64 --publish never",
-    "dist:dir": "vite build && node scripts/prepare-build.mjs && electron-builder --dir --publish never"
+    "dist:dir": "vite build && node scripts/prepare-build.mjs && electron-builder --dir --publish never",
+    "e2e:interaction": "node e2e/interaction.mjs dist"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
