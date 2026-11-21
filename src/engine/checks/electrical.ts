@@ -4,6 +4,7 @@
  * surge arresters, and auxiliary requirements.
  */
 import type { Citation } from '../../data/bulletin/types';
+import { ARRESTER_CLASSES } from '../../data/bulletin/arresters';
 import { CATALOG } from '../catalog';
 import { dist } from '../geometry';
 import { itemLabel, itemPorts } from '../items';
@@ -336,6 +337,32 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
       }
     }
   }
+  // Arrester class (§5.8.2): station class for 10 MVA+ stations, above 150 kV, or where fault current
+  // exceeds intermediate-class venting; distribution class only on the low side, beyond feeder devices.
+  const station = ARRESTER_CLASSES.find((c) => c.id === 'station')!;
+  const intermediate = ARRESTER_CLASSES.find((c) => c.id === 'intermediate')!;
+  const distribution = ARRESTER_CLASSES.find((c) => c.id === 'distribution')!;
+  const stationKVA = design.items.filter((i) => i.kind === 'transformer').reduce((sum, t) => sum + Number(t.props.kva), 0);
+  const feederDevices = [...facts.feederProtection.values()].filter((x): x is string => !!x);
+  for (const a of design.items) {
+    if (a.kind !== 'arrester') continue;
+    const node = topo.nodeOfPort.get(`${a.id}:a`);
+    if (!node) continue;
+    const cls = String(a.props.class);
+    const nodeKV = topo.nodeById.get(node)?.kv ?? a.kv;
+    const ventLimit = Number((intermediate.numbers as { safeVentingMaxA?: number }).safeVentingMaxA ?? 16000) / 1000;
+    const faultKA = Math.max(level.system.hvFaultKA, 0);
+    const needStation = stationKVA >= 10000 || nodeKV > 150 || (Math.abs(nodeKV - level.system.hvKV) < 0.01 && faultKA > ventLimit);
+    if (cls === 'distribution') {
+      const beyondFeederDevice = feederDevices.some((dId) => !topo.reach({ open: new Set([dId]) }).has(node));
+      if (Math.abs(nodeKV - level.system.hvKV) < 0.01 || !beyondFeederDevice) {
+        out.push({ id: fid('surge.class'), checkId: 'surge.class', severity: 'minor', category: 'lightning', title: `${itemLabel(a)}: distribution-class arresters misapplied`, detail: 'Distribution-class arresters may be used on the low-voltage side, on the load side of feeder reclosers or breakers. Use station or intermediate class elsewhere.', itemIds: [a.id], cite: [distribution.cite] });
+      }
+    } else if (cls === 'intermediate' && needStation) {
+      out.push({ id: fid('surge.class'), checkId: 'surge.class', severity: 'minor', category: 'lightning', title: `${itemLabel(a)}: use station-class arresters`, detail: `Station-class arresters are recommended for substations of 10,000 kVA and above, systems above 150 kV, and where fault current exceeds intermediate-class venting capability (${ventLimit} kA).`, itemIds: [a.id], cite: [station.cite] });
+    }
+  }
+
   for (const s of topo.sources) {
     const it = items.get(s.itemId)!;
     const port = itemPorts(it)[0]!.pos;

@@ -40,6 +40,13 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
 
 ## TODO (in priority order)
 1. Commit agent B's final edits (designProcess.ts, docs/research/civil-protection-notes.md) when it reports.
-2. Arrester MCOV/class checks (arresters.ts `selectMinimumMov`), recloser rating tables (reclosers.ts).
+2. Arrester MCOV display (class check done, §5.8.2), recloser rating tables (reclosers.ts).
 3. More levels: 115 kV ring-bus switching station (lines out), high-altitude site (Table 2-2/4-3).
 4. Self-audit facts vs bulletin; playtest; 1.0.0.
+
+## Self-audit log (facts re-checked against page text)
+Tables 4-1, 4-2, 4-6, 4-7, 4-8, Fig. 4-17 (30°/45°), Fig. 4-21 A/B, §4.7.3 shield wire 8900 N / 805 m,
+Table 5-11 rows, Table 5-28 (+668 A footnote), §5.2.2 fan uprates 15%/25%, §12.4.4.1 5/10/30 MVA fuse
+thresholds, §5.8.2 station class at 10,000 kVA, §9.10.2 3000 Ω·m surface minimum, §9.10.10 0.91 m
+perimeter rule, §2 8 ft fence (7 ft fabric + 1 ft barbed wire). Grounding equations cross-checked with
+IEEE 80 Annex B (tests/grounding.test.ts).
