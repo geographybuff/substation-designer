@@ -650,7 +650,11 @@ export function defaultProps(kind: ItemKind): Props {
   return p;
 }
 
-/** Conductor sizes for rigid bus (game catalogue; ampacities are game estimates unless cited). */
+/**
+ * Conductor sizes for rigid bus. The bulletin gives no ampacity tables; its only
+ * figure is 1890 A for 3 in Schedule 40 6063-T6 aluminum pipe (§4.11.3). The
+ * other ampacities are GAME ESTIMATES scaled from that value.
+ */
 export interface ConductorSize {
   key: string;
   label: string;
@@ -658,12 +662,14 @@ export interface ConductorSize {
   cite?: Citation;
 }
 
+const PIPE_3IN_AMPS: Citation = { page: 171, section: '4.11.3.1', note: '1890 A for 3 in Sch 40 6063-T6 pipe — the only ampacity value in the bulletin.' };
+
 export const CONDUCTOR_SIZES: ConductorSize[] = [
-  { key: 'pipe1.5', label: '1-1/2 in. Sch 40 aluminum pipe', ampacityA: 1000 },
-  { key: 'pipe2', label: '2 in. Sch 40 aluminum pipe', ampacityA: 1300 },
-  { key: 'pipe2.5', label: '2-1/2 in. Sch 40 aluminum pipe', ampacityA: 1800 },
-  { key: 'pipe3', label: '3 in. Sch 40 aluminum pipe', ampacityA: 2200 },
-  { key: 'pipe4', label: '4 in. Sch 40 aluminum pipe', ampacityA: 2900 },
+  { key: 'pipe1.5', label: '1-1/2 in. Sch 40 aluminum pipe', ampacityA: 900 },
+  { key: 'pipe2', label: '2 in. Sch 40 aluminum pipe', ampacityA: 1150 },
+  { key: 'pipe2.5', label: '2-1/2 in. Sch 40 aluminum pipe', ampacityA: 1550 },
+  { key: 'pipe3', label: '3 in. Sch 40 aluminum pipe', ampacityA: 1890, cite: PIPE_3IN_AMPS },
+  { key: 'pipe4', label: '4 in. Sch 40 aluminum pipe', ampacityA: 2500 },
 ];
 
 export const DEFAULT_CONDUCTOR = 'pipe2';
