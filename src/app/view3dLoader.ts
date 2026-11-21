@@ -22,5 +22,10 @@ export interface View3DModule {
 }
 
 export async function loadView3D(): Promise<View3DModule | null> {
-  return null;
+  try {
+    return await import('../render3d');
+  } catch (err) {
+    console.warn('3D view could not be loaded', err);
+    return null;
+  }
 }

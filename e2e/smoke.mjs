@@ -91,6 +91,13 @@ try {
   await page.click('[data-testid=tab-review]');
   await page.waitForTimeout(200);
   await page.screenshot({ path: join(shots, '07-review.png') });
+  // 3D view renders (WebGL via SwiftShader when headless), then back to plan view.
+  await page.click('[data-testid=view-3d]');
+  await page.waitForSelector('[data-testid=view3d] canvas', { timeout: 20000 });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: join(shots, '07b-3d.png') });
+  await page.click('text=Plan');
+  await page.waitForSelector('[data-testid=plan-canvas]');
   await page.click('[data-testid=energize]');
   await page.waitForSelector('[data-testid=results]');
   await page.waitForTimeout(300);
