@@ -159,6 +159,10 @@ export function checkGrounding(design: Design, level: LevelDef, g: GroundingResu
     if (w.code === 'unequal-spacing') continue;
     out.push({ id: fid(`ground.${w.code}`), checkId: `ground.${w.code}`, severity: w.code === 'cs-out-of-chart' ? 'info' : 'minor', category: 'grounding', title: 'Ground grid design advice', detail: w.message, cite: [w.cite] });
   }
+  const minT = GROUNDING_RULES.surfaceLayerMinThicknessM;
+  if (design.surfacing.material !== 'none' && design.surfacing.thicknessM + 1e-9 < minT.value) {
+    out.push({ id: fid('ground.surfacethin'), checkId: 'ground.surfacethin', severity: 'minor', category: 'grounding', title: 'Surface layer too thin', detail: `Cover the yard (and at least 1.0 m outside the fence) with at least ${minT.value * 100} cm (4 in) of crushed rock or equal of 3000 Ω·m or more.`, cite: [minT.cite] });
+  }
   if (design.surfacing.material === 'none') {
     out.push({ id: fid('ground.surface'), checkId: 'ground.surface', severity: 'info', category: 'grounding', title: 'No surface layer', detail: 'A layer of crushed rock greatly raises the tolerable touch and step voltages (reduction factor Cs, Table 9-4).', cite: [CITE.surface!] });
   }

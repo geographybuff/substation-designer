@@ -127,7 +127,7 @@ export const INFRARED_THERMOGRAPHY = {
     { deltaC: [4, 15] as const, action: 'deficiency, repair as time permits' },
     { deltaC: [16, null] as const, action: 'major deficiency, repair immediately' },
   ],
-  cite: { page: [723, 725], section: '18.3.2.1', originalSource: 'NFPA 70B, Section 18-16', note: 'Scan during maximum possible loading but not less than 40% of rating. The bulletin leaves 2-4 °C differences unclassified (as printed).' } satisfies Citation,
+  cite: { page: [723, 725], section: '18.3.2.1', originalSource: 'NFPA 70B, Section 18-16', note: 'UNCERTAIN: the printed bands (1-2, 4-15, 16+ °C) leave differences between 2 and 4 °C unclassified, so infraredSeverity returns null there. Scan during maximum possible loading but not less than 40% of rating.' } satisfies Citation,
 } as const;
 
 /** Severity class for an infrared temperature difference (°C) per §18.3.2.1; null below 1 °C or in the printed 2-4 °C gap. */
