@@ -19,6 +19,7 @@ import {
   transformerProps,
 } from '../engine/design';
 import { pointSegDist, samePoint, segments, snap } from '../engine/geometry';
+import { defaultRecloserRating } from '../engine/equipment';
 import { itemPorts, itemRect, type WorldPort } from '../engine/items';
 import type { Design, Rotation, Side, Vec2 } from '../engine/types';
 import { commit, currentLevel, redo, store, undo, type Tool } from '../app/store';
@@ -458,6 +459,7 @@ export class EditorController {
       return;
     }
     const it = makeItem(design, kind, x, y, this.ghostRot, s.tool.kv, props);
+    if (kind === 'recloser') Object.assign(it.props, defaultRecloserRating(s.tool.kv, String(it.props.interrupter)) ?? {});
     if (kind === 'feeder_exit') {
       const used = new Set(design.items.filter((i) => i.kind === 'feeder_exit').map((i) => i.props.feeder));
       const free = level.system.feeders.find((f) => !used.has(f.name));

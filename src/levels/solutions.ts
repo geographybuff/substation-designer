@@ -131,8 +131,8 @@ export const SOLUTIONS: Record<string, () => Design> = {
         it('T1', 'transformer', 14, 15.5, HV, { kva: 5000, cooling: 'OA/FA', lvKV: LV }, 0, 'T1'),
       );
       d.conductors.push(bus('H1', HV, [2.5, 18], [5, 18]), bus('H2', HV, [7.5, 18], [9.5, 18]), bus('H3', HV, [12, 18], [14, 18]), bus('L1', LV, [20, 18], [23, 18]), bus('LB', LV, [23, 12], [23, 24]));
-      const f1 = feederBay(1, 12, 'Feeder 1 — Elm Grove', { busX: 23, x0: 25, bypass: false, recloser: { continuousA: 200, interruptingKA: 4 } });
-      const f2 = feederBay(2, 24, 'Feeder 2 — Mill Road', { busX: 23, x0: 25, bypass: false, recloser: { continuousA: 200, interruptingKA: 4 } });
+      const f1 = feederBay(1, 12, 'Feeder 1 — Elm Grove', { busX: 23, x0: 25, bypass: false, recloser: { continuousA: 400, interruptingKA: 6 } });
+      const f2 = feederBay(2, 24, 'Feeder 2 — Mill Road', { busX: 23, x0: 25, bypass: false, recloser: { continuousA: 400, interruptingKA: 6 } });
       d.items.push(...f1.items, ...f2.items);
       d.conductors.push(...f1.conductors, ...f2.conductors);
       d.fence = { rect: { x: 0.5, y: 8, w: 39.5, h: 20 }, gate: { side: 'S', offset: 14, width: 6 } };
@@ -158,7 +158,7 @@ export const SOLUTIONS: Record<string, () => Design> = {
       );
       const names = ['Feeder 1 — North Ridge', 'Feeder 2 — Cottonwood', 'Feeder 3 — River Bottoms'];
       [14, 24, 34].forEach((y, i) => {
-        const b = feederBay(i + 1, y, names[i]!, { busX: 27, x0: 29, bypass: true, recloser: { continuousA: 400, interruptingKA: 8 } });
+        const b = feederBay(i + 1, y, names[i]!, { busX: 27, x0: 29, bypass: true, recloser: { continuousA: 400, interruptingKA: 6 } });
         d.items.push(...b.items);
         d.conductors.push(...b.conductors);
       });
@@ -204,7 +204,7 @@ export const SOLUTIONS: Record<string, () => Design> = {
       );
       const names = ['Feeder 1 — Hickory Hill', 'Feeder 2 — Clay Bank', 'Feeder 3 — Pine Flats'];
       [17, 27, 37].forEach((y, i) => {
-        const b = feederBay(i + 1, y, names[i]!, { busX: 34, x0: 36, bypass: true, kv: LV, recloser: { continuousA: 200, interruptingKA: 4 } });
+        const b = feederBay(i + 1, y, names[i]!, { busX: 34, x0: 36, bypass: true, kv: LV, recloser: { continuousA: 560, interruptingKA: 10 } });
         d.items.push(...b.items);
         d.conductors.push(...b.conductors);
       });
@@ -247,7 +247,7 @@ export const SOLUTIONS: Record<string, () => Design> = {
       );
       const names = ['Feeder 1 — Riverside', 'Feeder 2 — Processor', 'Feeder 3 — Oak Park', 'Feeder 4 — Mill Creek'];
       [9, 17, 27, 35].forEach((cx, i) => {
-        const b = verticalFeederBay(i + 1, cx, 28, names[i]!, { recloser: { continuousA: 400, interruptingKA: 8 } });
+        const b = verticalFeederBay(i + 1, cx, 28, names[i]!, { recloser: { continuousA: 560, interruptingKA: 12 } });
         d.items.push(...b.items);
         d.conductors.push(...b.conductors);
       });

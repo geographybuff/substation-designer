@@ -5,6 +5,8 @@
  */
 import type { Citation } from '../../data/bulletin/types';
 import { ARRESTER_CLASSES } from '../../data/bulletin/arresters';
+import { ARRESTER_CITES, arresterRating, LIGHTNING_MARGIN_MIN, transformerHvBilKV } from '../equipment';
+import { voltageClassFor } from '../../data/bulletin/voltageClasses';
 import { CATALOG } from '../catalog';
 import { dist } from '../geometry';
 import { itemLabel, itemPorts } from '../items';
@@ -349,6 +351,18 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
     const node = topo.nodeOfPort.get(`${a.id}:a`);
     if (!node) continue;
     const cls = String(a.props.class);
+    {
+      const kvNode = topo.nodeById.get(node)?.kv ?? a.kv;
+      const protectsXfmr = design.items.find((t) => t.kind === 'transformer' && topo.nodeOfPort.get(`${t.id}:hv`) === node);
+      const bil = protectsXfmr ? Math.min(transformerHvBilKV(protectsXfmr.kv), voltageClassFor(kvNode).bilKV) : voltageClassFor(kvNode).bilKV;
+      const r = arresterRating(kvNode, level.system.hvEffectivelyGrounded, Number(a.props.mcovKV) || 0, bil);
+      if (!r.auto && r.mcovKV + 1e-9 < r.minMcovKV) {
+        out.push({ id: fid('surge.mcov'), checkId: 'surge.mcov', severity: 'major', category: 'lightning', title: `${itemLabel(a)}: MCOV too low for the system`, detail: `On an effectively grounded ${kvNode} kV system the arrester MCOV must be at least ${r.minMcovKV.toFixed(1)} kV (E_LL × 1.05 / √3); ${r.mcovKV} kV would conduct at normal voltage and fail.`, itemIds: [a.id], cite: [ARRESTER_CITES.mcov] });
+      }
+      if (r.ratioL < LIGHTNING_MARGIN_MIN) {
+        out.push({ id: fid('surge.margin'), checkId: 'surge.margin', severity: 'major', category: 'lightning', title: `${itemLabel(a)}: protective margin too small`, detail: `Lightning protective level ≈ ${Math.round(r.lplKV)} kV against ${bil} kV BIL gives a ratio of ${r.ratioL.toFixed(2)}; at least ${LIGHTNING_MARGIN_MIN.toFixed(2)} is needed. Choose a lower MCOV rating.`, itemIds: [a.id], cite: [ARRESTER_CITES.margin] });
+      }
+    }
     const nodeKV = topo.nodeById.get(node)?.kv ?? a.kv;
     const ventLimit = Number((intermediate.numbers as { safeVentingMaxA?: number }).safeVentingMaxA ?? 16000) / 1000;
     const faultKA = Math.max(level.system.hvFaultKA, 0);

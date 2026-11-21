@@ -4,7 +4,7 @@
  */
 import { CONDUCTOR_SIZES } from '../catalog';
 import { transformerHVCurrentA, type StationCalc } from '../calc';
-import { regulatorCapacityA, regulatorRangeMultiplier, transformerTopRatingKVA } from '../equipment';
+import { isStandardRecloserRating, RECLOSER_TABLE_CITES, regulatorCapacityA, regulatorRangeMultiplier, transformerTopRatingKVA } from '../equipment';
 import { itemLabel } from '../items';
 import type { Topology } from '../topology';
 import type { Design, Finding, LevelDef } from '../types';
@@ -38,6 +38,9 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
     const faultKA = Math.max(...nodesKA);
     const amps = calc.deviceCurrentA.get(it.id) ?? 0;
 
+    if (it.kind === 'recloser' && !isStandardRecloserRating(it)) {
+      out.push({ id: fid('rating.recloser.std'), checkId: 'rating.recloser.std', severity: 'minor', category: 'ratings', title: `${itemLabel(it)}: not a standard recloser rating`, detail: `Pick one of the standard ${it.props.interrupter} recloser ratings for this voltage class in the inspector.`, itemIds: [it.id], cite: [it.props.interrupter === 'oil' ? RECLOSER_TABLE_CITES.oil : RECLOSER_TABLE_CITES.vacuum] });
+    }
     // --- Interrupting ratings ------------------------------------------------------
     if (it.kind === 'breaker' || it.kind === 'recloser' || it.kind === 'fuse' || it.kind === 'circuit_switcher') {
       const rating = Number(it.props.interruptingKA) || 0;

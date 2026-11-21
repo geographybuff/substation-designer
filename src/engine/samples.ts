@@ -62,13 +62,13 @@ export function sampleDesign(): Design {
     item('RG1', 'regulator', 22, 21, LV, { ratedA: 668, rangePct: 10, bypass: true }, 0, 'Bus regulators'),
     // Feeder 1 bay
     item('S2', 'switch', 29, 14.5, LV, {}, 0),
-    item('R1', 'recloser', 33, 14.5, LV, { continuousA: 560, interruptingKA: 10 }, 0, 'R1'),
+    item('R1', 'recloser', 33, 14.5, LV, { continuousA: 560, interruptingKA: 12 }, 0, 'R1'),
     item('S3', 'switch', 37, 14.5, LV, {}, 0),
     item('FE1', 'feeder_exit', 41, 14.5, LV, { feeder: 'Feeder 1 — North' }, 0, 'Feeder 1'),
     item('HS1', 'hookstick_switch', 33.5, 11, LV, { normallyOpen: true }, 0, 'R1 bypass'),
     // Feeder 2 bay
     item('S4', 'switch', 29, 26.5, LV, {}, 0),
-    item('R2', 'recloser', 33, 26.5, LV, { continuousA: 560, interruptingKA: 10 }, 0, 'R2'),
+    item('R2', 'recloser', 33, 26.5, LV, { continuousA: 560, interruptingKA: 12 }, 0, 'R2'),
     item('S5', 'switch', 37, 26.5, LV, {}, 0),
     item('FE2', 'feeder_exit', 41, 26.5, LV, { feeder: 'Feeder 2 — South' }, 0, 'Feeder 2'),
     item('HS2', 'hookstick_switch', 33.5, 31, LV, { normallyOpen: true }, 0, 'R2 bypass'),

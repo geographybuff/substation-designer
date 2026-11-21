@@ -3,7 +3,7 @@ import { voltageClassFor } from '../../data/bulletin/voltageClasses';
 import { busHeight, CATALOG, CONDUCTOR_SIZES, type PropDef } from '../../engine/catalog';
 import { conductorCost, itemCost } from '../../engine/costs';
 import { deleteConductors, deleteItems, deleteShieldWire, rotateItem, setFence, setItemProp, updateConductor, updateItem } from '../../engine/design';
-import { transformerTopRatingKVA } from '../../engine/equipment';
+import { arresterRating, isStandardRecloserRating, LIGHTNING_MARGIN_MIN, RECLOSER_TABLE_CITES, standardRecloserRows, transformerTopRatingKVA } from '../../engine/equipment';
 import { polylineLength } from '../../engine/geometry';
 import { footprintOf } from '../../engine/items';
 import { RELAY_OPTIONS } from '../../engine/relays';
@@ -77,6 +77,59 @@ function PropField({ def, value, onChange, level }: { def: PropDef; value: PropV
   );
 }
 
+function RecloserRating({ item, design }: { item: PlacedItem; design: Design }) {
+  const rows = standardRecloserRows(item.kv, String(item.props.interrupter));
+  const cur = `${item.props.continuousA}/${item.props.interruptingKA}`;
+  const std = isStandardRecloserRating(item);
+  const cite = item.props.interrupter === 'oil' ? RECLOSER_TABLE_CITES.oil : RECLOSER_TABLE_CITES.vacuum;
+  return (
+    <div class="field">
+      <label>Standard rating</label>
+      <select
+        value={std ? cur : ''}
+        onChange={(e) => {
+          const [a, ka] = (e.target as HTMLSelectElement).value.split('/').map(Number);
+          commit(updateItem(design, item.id, { props: { continuousA: a!, interruptingKA: ka! } }));
+        }}
+      >
+        {!std && <option value="">Non-standard — pick a rating</option>}
+        {rows.map((r) => (
+          <option key={r.line} value={`${r.continuousA}/${r.interruptingA / 1000}`}>
+            {r.continuousA} A / {r.interruptingA / 1000} kA ({r.ratedMaxKV} kV, line {r.line})
+          </option>
+        ))}
+      </select>
+      <div class="help">
+        Continuous and interrupting ratings as listed in Table {cite.table}. <CiteLink cite={cite} />
+      </div>
+    </div>
+  );
+}
+
+function ArresterInfo({ item, level, review }: { item: PlacedItem; level: LevelDef; review: DesignReview | null }) {
+  const node = review?.topo.nodeOfPort.get(`${item.id}:a`);
+  const kv = (node && review?.topo.nodeById.get(node)?.kv) || item.kv;
+  const r = arresterRating(kv, level.system.hvEffectivelyGrounded, Number(item.props.mcovKV) || 0, voltageClassFor(kv).bilKV);
+  return (
+    <div style={{ margin: '.4em 0' }}>
+      <div class="metric">
+        <span>Minimum MCOV (Eq. 5-7)</span>
+        <b>{r.minMcovKV.toFixed(1)} kV</b>
+      </div>
+      <div class="metric">
+        <span>Selected</span>
+        <b>
+          {r.mcovKV} kV MCOV / {r.dutyCycleKV} kV duty cycle
+        </b>
+      </div>
+      <div class="metric">
+        <span>Protective ratio BIL / LPL (≥ {LIGHTNING_MARGIN_MIN.toFixed(2)})</span>
+        <b style={{ color: r.ratioL < LIGHTNING_MARGIN_MIN ? 'var(--crit)' : undefined }}>{r.ratioL.toFixed(2)}</b>
+      </div>
+    </div>
+  );
+}
+
 function ItemInspector({ item, design, level, review }: { item: PlacedItem; design: Design; level: LevelDef; review: DesignReview | null }) {
   const def = CATALOG[item.kind];
   const fp = footprintOf(item);
@@ -124,7 +177,9 @@ function ItemInspector({ item, design, level, review }: { item: PlacedItem; desi
           </button>
         </div>
       )}
-      {def.props.map((p) => (p.showIf && item.props[p.showIf.key] !== p.showIf.equals ? null : <PropField key={p.key} def={p} value={item.props[p.key] ?? p.default} onChange={(v) => set(p.key, v)} level={level} />))}
+      {def.props.map((p) => (p.hidden || (p.showIf && item.props[p.showIf.key] !== p.showIf.equals) ? null : <PropField key={p.key} def={p} value={item.props[p.key] ?? p.default} onChange={(v) => set(p.key, v)} level={level} />))}
+      {item.kind === 'recloser' && <RecloserRating item={item} design={design} />}
+      {item.kind === 'arrester' && <ArresterInfo item={item} level={level} review={review} />}
       <div style={{ marginTop: '.6em' }}>
         {item.kind === 'transformer' && (
           <div class="metric">

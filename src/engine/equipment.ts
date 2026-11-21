@@ -4,6 +4,9 @@
 import { COOLING_UPRATE_RULES, forcedCooledRatingsKVA, standardImpedancePct, TABLE_5_11_STANDARD_IMPEDANCE, TABLE_5_9_THREE_PHASE_HV_BIL } from '../data/bulletin/transformers';
 import { regulatorCurrentCapabilityA, TABLE_5_28_SINGLE_PHASE_RANGE_CURRENT } from '../data/bulletin/regulators';
 import type { Citation } from '../data/bulletin/types';
+import { TABLE_5_60_OIL_RECLOSERS, TABLE_5_61_VACUUM_RECLOSERS, type RecloserRatingRow } from '../data/bulletin/reclosers';
+import { minDutyCycleUngroundedKV, minMcovSolidlyGroundedKV, PROTECTIVE_MARGINS, TABLE_5_57_CITE, TABLE_5_57_MOV_RATINGS, TABLE_5_58_MOV_CHARACTERISTICS } from '../data/bulletin/arresters';
+import { voltageClassFor } from '../data/bulletin/voltageClasses';
 import type { PlacedItem } from './types';
 
 export const EQUIPMENT_CITES = {
@@ -71,3 +74,87 @@ export function regulatorCapacityA(it: PlacedItem): number {
 export function regulatorRangeMultiplier(rangePct: number): number {
   return regulatorCurrentCapabilityA(100, rangePct, 1) / 100;
 }
+
+// ---------------------------------------------------------------------------
+// Reclosers: standard ratings from Tables 5-60 (oil) and 5-61 (vacuum)
+// ---------------------------------------------------------------------------
+
+export const RECLOSER_TABLE_CITES = {
+  oil: { page: 365, section: '5.9.3', table: '5-60' },
+  vacuum: { page: 366, section: '5.9.3', table: '5-61' },
+} satisfies Record<string, Citation>;
+
+/** Three-phase overhead recloser rating rows for the item's voltage class and interrupter type. */
+export function standardRecloserRows(kv: number, interrupter: string): RecloserRatingRow[] {
+  const vcMax = voltageClassFor(kv).maxKV;
+  const rows = (interrupter === 'oil' ? TABLE_5_60_OIL_RECLOSERS : TABLE_5_61_VACUUM_RECLOSERS).filter((r) => r.phases === 3 && r.ratedMaxKV >= vcMax - 1e-6);
+  if (!rows.length) return [];
+  const classMax = Math.min(...rows.map((r) => r.ratedMaxKV));
+  return rows.filter((r) => r.ratedMaxKV === classMax);
+}
+
+export function isStandardRecloserRating(it: PlacedItem): boolean {
+  const a = Number(it.props.continuousA);
+  const ka = Number(it.props.interruptingKA);
+  return standardRecloserRows(it.kv, String(it.props.interrupter)).some((r) => r.continuousA === a && Math.abs(r.interruptingA / 1000 - ka) < 1e-6);
+}
+
+/** A sensible default rating row (560 A where available). */
+export function defaultRecloserRating(kv: number, interrupter: string): { continuousA: number; interruptingKA: number } | null {
+  const rows = standardRecloserRows(kv, interrupter);
+  const r = rows.find((x) => x.continuousA === 560) ?? rows[Math.floor(rows.length / 2)];
+  return r ? { continuousA: r.continuousA, interruptingKA: r.interruptingA / 1000 } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Metal-oxide arresters: MCOV selection (Eq. 5-7) and protective margin (§5.8.7)
+// ---------------------------------------------------------------------------
+
+export interface ArresterRating {
+  /** Selected MCOV, kV rms (auto = smallest Table 5-57 rating meeting the minimum). */
+  mcovKV: number;
+  dutyCycleKV: number;
+  /** Minimum MCOV the system requires, kV rms. */
+  minMcovKV: number;
+  /** Lightning protective level (8x20 µs discharge, upper bound of Table 5-58), kV crest. */
+  lplKV: number;
+  /** BIL of the protected insulation, kV crest. */
+  bilKV: number;
+  /** Ratio L = BIL / LPL (must be ≥ 1.20). */
+  ratioL: number;
+  auto: boolean;
+}
+
+export const ARRESTER_CITES = {
+  mcov: { page: 344, section: '5.8.7.3', equation: '5-7' },
+  margin: { page: 347, section: '5.8.7' },
+  ratings: TABLE_5_57_CITE,
+} satisfies Record<string, Citation>;
+
+/**
+ * Rate an arrester on a system of nominal voltage `systemKV`. On effectively grounded systems the
+ * minimum MCOV is E_LL·1.05/√3 (Eq. 5-7); otherwise the duty-cycle rating must be at least E_LL·1.05.
+ * The lightning protective level uses the upper per-unit discharge voltage of the Table 5-58 station
+ * class row for the system, times the MCOV crest.
+ */
+export function arresterRating(systemKV: number, effectivelyGrounded: boolean, chosenMcovKV: number, protectedBilKV: number): ArresterRating {
+  const minMcov = effectivelyGrounded ? minMcovSolidlyGroundedKV(systemKV) : 0;
+  const minDuty = effectivelyGrounded ? 0 : minDutyCycleUngroundedKV(systemKV);
+  const sorted = [...TABLE_5_57_MOV_RATINGS].sort((a, b) => a.mcovKV - b.mcovKV);
+  const autoRow = sorted.find((r) => r.mcovKV >= minMcov - 1e-9 && r.dutyCycleKV >= minDuty - 1e-9) ?? sorted[sorted.length - 1]!;
+  const chosen = chosenMcovKV > 0 ? (sorted.find((r) => Math.abs(r.mcovKV - chosenMcovKV) < 1e-6) ?? autoRow) : autoRow;
+  const maxLL = voltageClassFor(systemKV).maxKV;
+  const row = TABLE_5_58_MOV_CHARACTERISTICS.station.find((r) => r.maxSystemLLkV >= maxLL - 1e-6) ?? TABLE_5_58_MOV_CHARACTERISTICS.station[TABLE_5_58_MOV_CHARACTERISTICS.station.length - 1]!;
+  const lpl = row.lightningDischarge8x20Pu[1] * Math.SQRT2 * chosen.mcovKV;
+  return {
+    mcovKV: chosen.mcovKV,
+    dutyCycleKV: chosen.dutyCycleKV,
+    minMcovKV: effectivelyGrounded ? minMcov : 0,
+    lplKV: lpl,
+    bilKV: protectedBilKV,
+    ratioL: protectedBilKV / lpl,
+    auto: !(chosenMcovKV > 0),
+  };
+}
+
+export const LIGHTNING_MARGIN_MIN = PROTECTIVE_MARGINS.lightningMinRatio;

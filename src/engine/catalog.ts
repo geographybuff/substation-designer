@@ -10,6 +10,7 @@
  */
 import type { Citation } from '../data/bulletin/types';
 import { VOLTAGE_CLASS_CITES, voltageClassFor, type VoltageClassRow } from '../data/bulletin/voltageClasses';
+import { TABLE_5_57_MOV_RATINGS } from '../data/bulletin/arresters';
 import { ceilTo } from './geometry';
 import type { ConductorElevation, ItemKind, PropValue, Props, Vec2 } from './types';
 
@@ -79,6 +80,8 @@ export interface PropDef {
   cite?: Citation;
   /** Only show when another prop has a given value. */
   showIf?: { key: string; equals: PropValue };
+  /** Edited through a custom control instead of the generic field. */
+  hidden?: boolean;
 }
 
 export interface ItemDef {
@@ -373,8 +376,8 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     props: [
       sel('control', 'Control', [['electronic', 'Electronic'], ['hydraulic', 'Hydraulic']], 'electronic'),
       sel('interrupter', 'Interrupter', [['vacuum', 'Vacuum'], ['oil', 'Oil']], 'vacuum'),
-      sel('continuousA', 'Continuous current', [[200, '200 A'], [400, '400 A'], [560, '560 A'], [800, '800 A'], [1200, '1200 A']], 560),
-      sel('interruptingKA', 'Interrupting rating', [[4, '4 kA'], [6, '6 kA'], [8, '8 kA'], [10, '10 kA'], [12, '12 kA'], [16, '16 kA']], 10),
+      sel('continuousA', 'Continuous current', [[50, '50 A'], [100, '100 A'], [200, '200 A'], [280, '280 A'], [400, '400 A'], [560, '560 A'], [800, '800 A'], [1120, '1120 A']], 560, { hidden: true }),
+      sel('interruptingKA', 'Interrupting rating', [[1.25, '1.25 kA'], [2, '2 kA'], [2.5, '2.5 kA'], [4, '4 kA'], [6, '6 kA'], [8, '8 kA'], [10, '10 kA'], [12, '12 kA'], [16, '16 kA']], 12, { hidden: true }),
       bool('reclosing', 'Reclosing enabled', true),
     ],
     cites: [{ page: 357, section: '5.9' }, CITE_LAYOUT_DIST],
@@ -453,6 +456,13 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     },
     props: [
       sel('class', 'Arrester class', [['station', 'Station'], ['intermediate', 'Intermediate'], ['distribution', 'Distribution']], 'station'),
+      sel(
+        'mcovKV',
+        'MCOV rating',
+        [[0, 'Auto (minimum for the system, Eq. 5-7)'], ...TABLE_5_57_MOV_RATINGS.filter((r) => r.mcovKV <= 245).map((r): [number, string] => [r.mcovKV, `${r.mcovKV} kV MCOV (${r.dutyCycleKV} kV duty cycle)`])],
+        0,
+        { help: 'Maximum continuous operating voltage. Too low and the arrester fails at normal voltage; too high and it no longer protects the insulation (Table 5-57, §5.8.7).' },
+      ),
     ],
     cites: [CITE_ARRESTERS, { page: 323, section: '5.8' }],
   },
