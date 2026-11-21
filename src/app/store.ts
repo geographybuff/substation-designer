@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { newDesign } from '../engine/design';
 import { reviewDesign, type DesignReview } from '../engine/review';
+import { setSiteAltitude } from '../engine/site';
 import type { Design, ItemKind, LevelDef } from '../engine/types';
 import { DEFAULT_GRAPHICS, type GraphicsSettings } from '../settings/graphics';
 import { getLevel } from '../levels';
@@ -194,6 +195,7 @@ function autosave(): void {
 export function startLevel(levelId: string, fresh = false): void {
   const level = getLevel(levelId);
   if (!level) return;
+  setSiteAltitude(level.site.altitudeM);
   const saved = fresh ? null : load<Design | null>(`design:${levelId}`, null);
   const design = saved && saved.version === 1 && saved.levelId === levelId ? saved : newDesign(level);
   store.set({

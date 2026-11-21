@@ -10,6 +10,7 @@
 import { CONDUCTOR_SIZES } from './catalog';
 import { transformerTopRatingKVA } from './equipment';
 import { polylineLength } from './geometry';
+import { clearanceClassFor, isHighAltitude } from './site';
 import type { Conductor, Design, LevelDef, PlacedItem } from './types';
 
 /** Price scale by voltage class (1.0 at 15 kV class). */
@@ -25,8 +26,14 @@ export function voltageFactor(kv: number): number {
   return 5.5;
 }
 
+/**
+ * Voltage used for pricing: above 1000 m equipment is bought with the higher BIL that §4.9
+ * selects, priced here like equipment of that voltage class (GAME ASSUMPTION).
+ */
+const priceKV = (kv: number): number => (isHighAltitude() && kv > 0 ? Math.max(kv, clearanceClassFor(kv).maxKV) : kv);
+
 export function itemCost(it: PlacedItem): number {
-  const vf = voltageFactor(it.kv);
+  const vf = voltageFactor(priceKV(it.kv));
   const p = it.props;
   switch (it.kind) {
     case 'line_terminal':
@@ -51,7 +58,8 @@ export function itemCost(it: PlacedItem): number {
     case 'transformer': {
       const kva = Number(p.kva);
       const top = transformerTopRatingKVA(it);
-      const hvf = it.kv <= 72.5 ? 1 : it.kv <= 145 ? 1.25 : it.kv <= 169 ? 1.35 : 1.6;
+      const hkv = priceKV(it.kv);
+      const hvf = hkv <= 72.5 ? 1 : hkv <= 145 ? 1.25 : hkv <= 169 ? 1.35 : 1.6;
       let c = (120_000 + kva * 32 + (top - kva) * 10) * hvf;
       if (p.ltc) c += 110_000;
       if (p.arresters === 'hv') c += 4_000 * voltageFactor(it.kv);

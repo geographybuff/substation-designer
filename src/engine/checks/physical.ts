@@ -3,6 +3,10 @@
  * electrical clearances (Table 4-7), site limits and equipment removal (§4.2.6).
  */
 import { VOLTAGE_CLASS_CITES, voltageClassFor } from '../../data/bulletin/voltageClasses';
+import { ALTITUDE_CITES, clearanceClassFor, isHighAltitude } from '../site';
+
+/** Table 4-7 clearances, plus the §4.9 altitude procedure above 1000 m. */
+const clearanceCites = () => (isHighAltitude() ? [VOLTAGE_CLASS_CITES.clearances, ALTITUDE_CITES.clearances] : [VOLTAGE_CLASS_CITES.clearances]);
 import { busHeight, CATALOG } from '../catalog';
 import { distToRectBoundary, pointInRect, rectContainsRect, rectGap, rectInsetFrom, rectsOverlap, segRectDist, segments } from '../geometry';
 import { footprintOf, itemLabel, itemPorts, itemRect } from '../items';
@@ -51,7 +55,7 @@ function itemKV(it: PlacedItem): number {
 }
 
 /** Conductor segment's outer-phase offset from its centerline. */
-const phaseOffset = (kv: number) => voltageClassFor(kv).rigidBusPhaseSpacingM;
+const phaseOffset = (kv: number) => clearanceClassFor(kv).rigidBusPhaseSpacingM;
 
 /**
  * Plan-view envelope of a three-phase bus segment: the centreline inflated by
@@ -194,10 +198,10 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
       if (nodeOf(A.id) === nodeOf(B.id)) continue;
       if (A.elevation !== B.elevation) {
         const vgap = Math.abs(busHeight(A.kv, A.elevation) - busHeight(B.kv, B.elevation));
-        const c = Math.max(voltageClassFor(A.kv).minMetalToMetalM, voltageClassFor(B.kv).minMetalToMetalM);
+        const c = Math.max(clearanceClassFor(A.kv).minMetalToMetalM, clearanceClassFor(B.kv).minMetalToMetalM);
         if (vgap >= c + 0.5) continue;
       }
-      const need = Math.max(voltageClassFor(A.kv).minMetalToMetalM, voltageClassFor(B.kv).minMetalToMetalM);
+      const need = Math.max(clearanceClassFor(A.kv).minMetalToMetalM, clearanceClassFor(B.kv).minMetalToMetalM);
       let dmin = Infinity;
       let at: Vec2 | undefined;
       const envA = conductorEnvelopes(A);
@@ -224,7 +228,7 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
           detail: `Outer phases are ${dmin.toFixed(2)} m apart; Table 4-7 minimum metal-to-metal clearance is ${need.toFixed(3)} m. Crossing buses must be at different elevations.`,
           conductorIds: [A.id, B.id],
           at,
-          cite: [VOLTAGE_CLASS_CITES.clearances],
+          cite: clearanceCites(),
         });
       }
     }
@@ -234,7 +238,7 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
   for (const c of conds) {
     const cn = nodeOf(c.id);
     const ch = busHeight(c.kv, c.elevation);
-    const vcC = voltageClassFor(c.kv);
+    const vcC = clearanceClassFor(c.kv);
     for (const it of design.items) {
       const def = CATALOG[it.kind];
       const r = rects.get(it.id)!;
@@ -256,7 +260,7 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
               detail: `Clearance to grounded parts is ${dmin.toFixed(2)} m; Table 4-7 requires ${vcC.minToGroundedPartsM.toFixed(3)} m at ${c.kv} kV.`,
               conductorIds: [c.id],
               itemIds: [it.id],
-              cite: [VOLTAGE_CLASS_CITES.clearances],
+              cite: clearanceCites(),
             });
           }
         }
@@ -264,7 +268,7 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
       }
       if (!def.live || sharesNode) continue;
       // High bus passing over lower equipment is fine with adequate vertical gap.
-      const metal = Math.max(vcC.minMetalToMetalM, voltageClassFor(it.kv || c.kv).minMetalToMetalM);
+      const metal = Math.max(vcC.minMetalToMetalM, clearanceClassFor(it.kv || c.kv).minMetalToMetalM);
       if (ch - fp.height >= metal + 0.5) continue;
       let dmin = Infinity;
       for (const e of conductorEnvelopes(c)) dmin = Math.min(dmin, rectGap(e, r));
@@ -279,7 +283,7 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
           detail: `A bus that is not connected to this equipment passes ${dmin.toFixed(2)} m from it. Reroute it, raise it to high-bus elevation, or move the equipment (Table 4-7).`,
           conductorIds: [c.id],
           itemIds: [it.id],
-          cite: [VOLTAGE_CLASS_CITES.clearances],
+          cite: clearanceCites(),
         });
       }
     }
@@ -375,7 +379,7 @@ export function removalPath(design: Design, item: PlacedItem, rects: Map<string,
     if (it.id === item.id) continue;
     markRect(rects.get(it.id)!, half - 0.01);
   }
-  const vc = voltageClassFor(item.kv || 12.47);
+  const vc = clearanceClassFor(item.kv || 12.47);
   // The item's own leads (conductors ending on its terminals) are removed with it.
   const ownPorts = itemPorts(item, fp).map((p) => p.pos);
   for (const c of design.conductors) {

@@ -10,7 +10,7 @@
  * schemes (§4.6), shielding (§4.7.3) and surge arresters (§4.3.5).
  */
 import type { StationCalc } from './calc';
-import { transformerTopRatingKVA } from './equipment';
+import { transformerSiteRatingKVA } from './equipment';
 import { polylineLength } from './geometry';
 import type { ElectricalFacts } from './checks/electrical';
 import { isProtective, type TEndpoint, type Topology } from './topology';
@@ -141,7 +141,7 @@ export function evaluateReliability(
     // Overloaded transformers age faster (game rule).
     if (it.kind === 'transformer') {
       const load = calc.transformerLoadMVA.get(it.id);
-      const top = transformerTopRatingKVA(it) / 1000;
+      const top = transformerSiteRatingKVA(it) / 1000;
       if (load && load.horizon > top) lambda *= 1 + 2 * (load.horizon / top - 1);
     }
     const clearer = isProtective(it.kind) ? clearingDevice(it.id) : (clearingDevice(it.id) ?? null);

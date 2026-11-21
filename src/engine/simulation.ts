@@ -5,7 +5,7 @@
  */
 import type { Citation } from '../data/bulletin/types';
 import { loadAt } from './calc';
-import { transformerTopRatingKVA } from './equipment';
+import { transformerSiteRatingKVA } from './equipment';
 import { EVENT_ASSUMPTIONS } from './reliability';
 import type { DesignReview } from './review';
 import type { Design, LevelDef } from './types';
@@ -77,7 +77,7 @@ export function simulate(design: Design, level: LevelDef, review: DesignReview, 
   const events: SimEvent[] = [];
   const minutesByYear = new Array<number>(years).fill(0);
   const total = review.reliability.totalCustomers;
-  const capacityMVA = design.items.filter((i) => i.kind === 'transformer').reduce((s, t) => s + transformerTopRatingKVA(t) / 1000, 0);
+  const capacityMVA = design.items.filter((i) => i.kind === 'transformer').reduce((s, t) => s + transformerSiteRatingKVA(t) / 1000, 0);
   const peakByYear: number[] = [];
   let momentary = 0;
   let warnedCapacity = false;

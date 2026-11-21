@@ -9,7 +9,8 @@
  * so energized parts sit above the Table 4-7 personal-safety ground clearance.
  */
 import type { Citation } from '../data/bulletin/types';
-import { VOLTAGE_CLASS_CITES, voltageClassFor, type VoltageClassRow } from '../data/bulletin/voltageClasses';
+import { VOLTAGE_CLASS_CITES, type VoltageClassRow } from '../data/bulletin/voltageClasses';
+import { clearanceClassFor } from './site';
 import { TABLE_5_57_MOV_RATINGS } from '../data/bulletin/arresters';
 import { ceilTo } from './geometry';
 import type { ConductorElevation, ItemKind, PropValue, Props, Vec2 } from './types';
@@ -111,7 +112,7 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 
 /** Low-profile rigid bus height for a voltage class: ground clearance + 1.2 m. */
 export function busHeight(kv: number, elevation: ConductorElevation): number {
-  const vc = voltageClassFor(kv);
+  const vc = clearanceClassFor(kv);
   const low = r1(vc.groundClearanceM + 1.2);
   if (elevation === 'low') return low;
   return r1(Math.max(vc.roadwayClearanceM + 0.5, low + 3));
@@ -190,7 +191,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 2);
       const h = r1(Math.max(vc.roadwayClearanceM + 2, 8));
       return onePort(1.5, d, h, h + 1, 'right');
@@ -209,7 +210,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv, props) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1);
       const h = props.underground ? 4 : 9;
       return onePort(1.5, d, props.underground ? busHeight(kv, 'low') : 8.5, h, 'left');
@@ -235,7 +236,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv, props) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const style = props.style as string;
       const spacing =
         style === 'side_break'
@@ -272,7 +273,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.switchSpacingVerticalBreakM, 0.6);
       const h = busHeight(kv, 'low');
       return twoPort(1.5, d, h, h + 0.4);
@@ -294,7 +295,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.switchSpacingVerticalBreakM, 1);
       const w = ceilTo(1.5 + 1.2 * vc.switchMinMetalToMetalM, 0.5);
       const h = busHeight(kv, 'low');
@@ -317,7 +318,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1);
       const w = ceilTo(2.5 + vc.minMetalToMetalM, 0.5);
       const h = busHeight(kv, 'low');
@@ -341,7 +342,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1.5);
       const w = ceilTo(2.0 + 1.5 * vc.minMetalToMetalM, 0.5);
       const top = r1(vc.groundClearanceM + 1.8);
@@ -368,7 +369,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1.0);
       const top = r1(vc.groundClearanceM + 1.3);
       return twoPort(2, d, top, top + 0.3);
@@ -394,7 +395,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const w = kv <= 69 ? 6 : kv <= 161 ? 7 : 8;
       const d = Math.max(5, phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1.5));
       const top = r1(3.6 + 0.012 * kv);
@@ -426,7 +427,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = Math.max(4, phaseWidth(vc, Math.max(1.2, vc.rigidBusPhaseSpacingM), 1.6));
       return twoPort(2.5, d, 4.0, 4.3);
     },
@@ -449,7 +450,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 0.6);
       const h = busHeight(kv, 'low');
       return onePort(1, d, h, h + 0.4);
@@ -477,7 +478,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = Math.max(3, phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1.5));
       return onePort(4, d, 5, 5.3);
     },
@@ -499,7 +500,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 0.6);
       const h = busHeight(kv, 'low');
       return onePort(1, d, h, h + 0.3);
@@ -518,7 +519,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 0.6);
       const h = busHeight(kv, 'low');
       return onePort(1, d, h, h + 0.6);
@@ -537,7 +538,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 0.6);
       const h = busHeight(kv, 'low');
       return twoPort(1.5, d, h + 1, h + 1.5);
@@ -556,7 +557,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: true,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = phaseWidth(vc, vc.rigidBusPhaseSpacingM, 0.6);
       const h = busHeight(kv, 'low');
       return twoPort(2, d, h, h + 0.5);
@@ -593,7 +594,7 @@ export const CATALOG: Record<ItemKind, ItemDef> = {
     grounded: false,
     live: false,
     footprint(kv) {
-      const vc = voltageClassFor(kv);
+      const vc = clearanceClassFor(kv);
       const d = Math.max(4, phaseWidth(vc, vc.rigidBusPhaseSpacingM, 1));
       return twoPort(14, d, 4.5, 4.5, ['hv', 'lv']);
     },

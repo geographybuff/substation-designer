@@ -2,7 +2,7 @@
  * Canvas 2D plan view: camera, rendering and hit testing. Renders on demand
  * (only when something changed) and honours the graphics settings.
  */
-import { voltageClassFor } from '../data/bulletin/voltageClasses';
+import { clearanceClassFor } from '../engine/site';
 import { busHeight, CATALOG } from '../engine/catalog';
 import { fenceRequiredDistance, gateSegment, removalPath } from '../engine/checks/physical';
 import { pointSegDist, samePoint, segments } from '../engine/geometry';
@@ -158,7 +158,7 @@ export class PlanView {
     const tol = tolPx / this.cam.scale;
     let best: { id: string; d: number } | null = null;
     for (const c of s.design.conductors) {
-      const extra = voltageClassFor(c.kv).rigidBusPhaseSpacingM;
+      const extra = clearanceClassFor(c.kv).rigidBusPhaseSpacingM;
       for (const [a, b] of segments(c.points)) {
         const d = pointSegDist(p, a, b);
         if (d <= tol + extra && (!best || d < best.d)) best = { id: c.id, d };
@@ -537,7 +537,7 @@ export class PlanView {
 
   private drawConductor(points: readonly Vec2[], kv: number, elevation: 'low' | 'high', mark: 'sel' | 'hover' | null, alpha = 1): void {
     const ctx = this.ctx;
-    const s = voltageClassFor(kv).rigidBusPhaseSpacingM;
+    const s = clearanceClassFor(kv).rigidBusPhaseSpacingM;
     const color = kvColor(kv);
     ctx.globalAlpha = alpha;
     if (mark) {

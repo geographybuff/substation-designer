@@ -3,7 +3,8 @@ import { voltageClassFor } from '../../data/bulletin/voltageClasses';
 import { busHeight, CATALOG, CONDUCTOR_SIZES, type PropDef } from '../../engine/catalog';
 import { conductorCost, itemCost } from '../../engine/costs';
 import { deleteConductors, deleteItems, deleteShieldWire, rotateItem, setFence, setItemProp, updateConductor, updateItem } from '../../engine/design';
-import { arresterRating, isStandardRecloserRating, LIGHTNING_MARGIN_MIN, RECLOSER_TABLE_CITES, standardRecloserRows, transformerTopRatingKVA } from '../../engine/equipment';
+import { arresterRating, isStandardRecloserRating, LIGHTNING_MARGIN_MIN, RECLOSER_TABLE_CITES, standardRecloserRows, transformerSiteRatingKVA, transformerTopRatingKVA } from '../../engine/equipment';
+import { clearanceClassFor, isHighAltitude, siteAltitudeM, siteBilFactor } from '../../engine/site';
 import { polylineLength } from '../../engine/geometry';
 import { footprintOf } from '../../engine/items';
 import { RELAY_OPTIONS } from '../../engine/relays';
@@ -187,6 +188,12 @@ function ItemInspector({ item, design, level, review }: { item: PlacedItem; desi
             <b>{(transformerTopRatingKVA(item) / 1000).toFixed(1)} MVA</b>
           </div>
         )}
+        {item.kind === 'transformer' && isHighAltitude() && (
+          <div class="metric" title="Table 5-2: fan-cooled ratings derate 0.5% and self-cooled 0.4% per 100 m above 1000 m">
+            <span>Usable at {siteAltitudeM()} m</span>
+            <b>{(transformerSiteRatingKVA(item) / 1000).toFixed(1)} MVA</b>
+          </div>
+        )}
         {tLoad && (
           <div class="metric">
             <span>Load now / year {level.system.horizonYears}</span>
@@ -240,7 +247,7 @@ function ItemInspector({ item, design, level, review }: { item: PlacedItem; desi
 
 function ConductorInspector({ id, design, review }: { id: string; design: Design; review: DesignReview | null }) {
   const c = design.conductors.find((x) => x.id === id)!;
-  const vc = voltageClassFor(c.kv);
+  const vc = clearanceClassFor(c.kv);
   const node = review?.topo.nodeOfConductor.get(c.id);
   const amps = node ? review?.calc.nodeCurrentA.get(node) : undefined;
   return (
@@ -328,7 +335,9 @@ function SiteInspector({ design, level }: { design: Design; level: LevelDef }) {
       </div>
       <div class="metric">
         <span>Altitude</span>
-        <b>{level.site.altitudeM} m</b>
+        <b>
+          {level.site.altitudeM} m{isHighAltitude(level.site.altitudeM) ? ` (BIL × ${siteBilFactor(level.site.altitudeM).toFixed(2)})` : ''}
+        </b>
       </div>
       <div class="metric">
         <span>Soil resistivity</span>

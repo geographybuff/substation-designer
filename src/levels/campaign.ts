@@ -438,6 +438,63 @@ export const L7_RING_AROUND: LevelDef = {
   reliabilityTarget: 8,
 };
 
+export const L8_THIN_AIR: LevelDef = {
+  id: 'l8-thin-air',
+  order: 8,
+  title: 'Thin Air',
+  subtitle: 'Building at 2400 m (8000 ft)',
+  client: 'Summit Range Electric Association',
+  briefing: [
+    'Summit Range serves a ski town high in the mountains. Its new substation sits at 2400 m (8000 ft), where thin air insulates and cools less than at sea level.',
+    'Above 1000 m (3300 ft) the bulletin derates insulation by Table 4-3. Its own example fits this site: at 2400 m, 115 kV equipment is bought with a 650 kV BIL instead of 550 kV and laid out with the clearances of that BIL (Table 4-9). The game applies the correction to footprints, bus heights and clearance checks; give the larger equipment room.',
+    'Equipment also carries less current up here. Transformer ratings derate by Table 5-2, and regulators, reclosers, switches and bus by Tables 5-34, 5-59, 5-41 and 4-10. Size the transformer for the derated rating, protect it with relays (it is too big for fuses), and add arresters and a safe ground grid in the rocky soil.',
+  ],
+  topics: [
+    { text: 'Altitude correction factors for BIL (Table 4-3)', cite: { page: [146, 147], section: '4.8.1.2', table: '4-3' } },
+    { text: 'Clearances above 1000 m: derate, then select (Table 4-9)', cite: { page: 156, section: '4.9', table: '4-9' } },
+    { text: 'Transformer kVA derating with altitude (Table 5-2)', cite: { page: 193, section: '5.2.3.1', table: '5-2' } },
+    { text: 'Breaker and recloser altitude factors (Tables 5-25, 5-59)', cite: { page: [234, 361], section: '5.3.3.2.2 / 5.9.1.3' } },
+  ],
+  site: { width: 66, depth: 50, altitudeM: 2400, soilResistivity: 300, isokeraunicDays: 40, roadSide: 'S', notes: ['Mountain bench at 2400 m (8000 ft).', 'Thin, rocky soil: uniform resistivity about 300 Ω·m.', 'Afternoon thunderstorms in summer.'] },
+  system: {
+    hvKV: 115,
+    lvKV: 24.9,
+    hvFaultKA: 5,
+    hvGroundFaultKA: 4,
+    xOverR: 7,
+    splitFactor: 0.7,
+    faultDurationS: 0.5,
+    loadMVA: 9.5,
+    growthPct: 2.5,
+    horizonYears: 10,
+    powerFactor: 0.95,
+    hvEffectivelyGrounded: true,
+    feeders: [
+      { name: 'Feeder 1 — Summit Village', share: 0.6, customers: 2400 },
+      { name: 'Feeder 2 — Ski Area', share: 0.4, customers: 600 },
+    ],
+  },
+  fixtures: [fixture('L1', 'line_terminal', 3, 16, 115, 'Line from Granite Pass', { flow: 'in' })],
+  tools: [...DIST_TOOLS_BASIC, 'circuit_switcher', 'hookstick_switch', 'regulator', 'arrester', 'mast'],
+  features: { fence: true, groundGrid: true, shieldWires: true, surfacing: true },
+  checksOff: ['aux.', 'layout.removal'],
+  budget: 1_550_000,
+  objectives: [
+    { id: 'o1', kind: 'feeders_served', text: 'Serve both feeders' },
+    { id: 'o2', kind: 'feeder_protection', text: 'Protect each feeder', cite: { page: 122, section: '4.3.1' } },
+    { id: 'o3', kind: 'transformer_protection', text: 'Protect the transformer primary', cite: { page: 122, section: '4.3.2' } },
+    { id: 'o4', kind: 'transformer_capacity', text: 'Size the transformer for its derated rating', cite: { page: 193, section: '5.2.3.1', table: '5-2' } },
+    { id: 'o5', kind: 'clearances', text: 'Keep the altitude-corrected clearances', cite: { page: 156, section: '4.9', table: '4-9' } },
+    { id: 'o6', kind: 'voltage_regulation', text: 'Regulate feeder voltage', cite: { page: 122, section: '4.3.3' } },
+    { id: 'o7', kind: 'arresters', text: 'Install surge arresters at the transformer and line entrance', cite: { page: 124, section: '4.3.5' } },
+    { id: 'o8', kind: 'grounding_safe', text: 'Keep touch and step voltages below tolerable limits', cite: { page: [548, 554], section: '9.10' } },
+    { id: 'o9', kind: 'fence', text: 'Fence the yard with proper safety clearance', cite: { page: 158, figure: '4-21' } },
+    { id: 'o10', kind: 'shielding', text: 'Shield all energized equipment', optional: true, cite: { page: 143, section: '4.7.3.4.1' } },
+  ],
+  simYears: 10,
+  reliabilityTarget: 340,
+};
+
 export const SANDBOX: LevelDef = {
   id: 'sandbox',
   order: 99,

@@ -7,7 +7,8 @@
  */
 import { busHeight } from '../../engine/catalog';
 import type { SceneItem } from '../../engine/scene';
-import { voltageClassFor, type VoltageClassRow } from '../../data/bulletin/voltageClasses';
+import { type VoltageClassRow } from '../../data/bulletin/voltageClasses';
+import { clearanceClassFor } from '../../engine/site';
 import type { Parts, V3 } from '../parts';
 
 export type PortId = 'a' | 'b' | 'hv' | 'lv';
@@ -49,9 +50,9 @@ export type ModelFn = (p: Parts, I: ItemInfo) => ModelOut;
 
 export function vclass(kv: number): VoltageClassRow {
   try {
-    return voltageClassFor(kv > 0 ? kv : 12.47);
+    return clearanceClassFor(kv > 0 ? kv : 12.47);
   } catch {
-    return voltageClassFor(230);
+    return clearanceClassFor(230);
   }
 }
 

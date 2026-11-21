@@ -7,6 +7,7 @@ import type { Citation } from '../data/bulletin/types';
 import { TABLE_5_60_OIL_RECLOSERS, TABLE_5_61_VACUUM_RECLOSERS, type RecloserRatingRow } from '../data/bulletin/reclosers';
 import { minDutyCycleUngroundedKV, minMcovSolidlyGroundedKV, PROTECTIVE_MARGINS, TABLE_5_57_CITE, TABLE_5_57_MOV_RATINGS, TABLE_5_58_MOV_CHARACTERISTICS } from '../data/bulletin/arresters';
 import { voltageClassFor } from '../data/bulletin/voltageClasses';
+import { recloserVoltageFactor, transformerSiteFactor } from './site';
 import type { PlacedItem } from './types';
 
 export const EQUIPMENT_CITES = {
@@ -41,6 +42,14 @@ export function transformerTopRatingKVA(it: PlacedItem): number {
   const kva = Number(it.props.kva) || 0;
   const { ratings } = transformerRatings(kva, String(it.props.cooling ?? 'OA'));
   return ratings[ratings.length - 1] ?? kva;
+}
+
+/**
+ * Top rating usable at the site: Table 5-2 derates forced-air ratings 0.5 % and self-cooled
+ * ratings 0.4 % per 100 m above 1000 m (3300 ft). Equal to the nameplate top rating below 1000 m.
+ */
+export function transformerSiteRatingKVA(it: PlacedItem): number {
+  return transformerTopRatingKVA(it) * transformerSiteFactor(coolingStages(String(it.props.cooling ?? 'OA')) > 0);
 }
 
 /** HV winding BIL of a three-phase power transformer (Table 5-9), kV. */
@@ -84,10 +93,15 @@ export const RECLOSER_TABLE_CITES = {
   vacuum: { page: 366, section: '5.9.3', table: '5-61' },
 } satisfies Record<string, Citation>;
 
-/** Three-phase overhead recloser rating rows for the item's voltage class and interrupter type. */
+/**
+ * Three-phase overhead recloser rating rows for the item's voltage class and interrupter type.
+ * Above 1000 m the rated maximum voltage is multiplied by the Table 5-59 voltage factor, so a
+ * higher voltage class may be needed.
+ */
 export function standardRecloserRows(kv: number, interrupter: string): RecloserRatingRow[] {
   const vcMax = voltageClassFor(kv).maxKV;
-  const rows = (interrupter === 'oil' ? TABLE_5_60_OIL_RECLOSERS : TABLE_5_61_VACUUM_RECLOSERS).filter((r) => r.phases === 3 && r.ratedMaxKV >= vcMax - 1e-6);
+  const vf = recloserVoltageFactor();
+  const rows = (interrupter === 'oil' ? TABLE_5_60_OIL_RECLOSERS : TABLE_5_61_VACUUM_RECLOSERS).filter((r) => r.phases === 3 && r.ratedMaxKV * vf >= vcMax - 1e-6);
   if (!rows.length) return [];
   const classMax = Math.min(...rows.map((r) => r.ratedMaxKV));
   return rows.filter((r) => r.ratedMaxKV === classMax);

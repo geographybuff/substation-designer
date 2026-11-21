@@ -5,7 +5,7 @@
  */
 import type { Footprint } from '../engine/catalog';
 import type { PlacedItem } from '../engine/types';
-import { voltageClassFor } from '../data/bulletin/voltageClasses';
+import { clearanceClassFor } from '../engine/site';
 import { kvColor, THEME } from './theme';
 
 export interface DrawOpts {
@@ -32,7 +32,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: PlacedItem, fp: Foot
   const hd = d / 2;
   const kv = it.kind === 'transformer' ? it.kv : it.kv;
   const color = kvColor(kv);
-  const spacing = it.kv > 0 ? Math.min(voltageClassFor(it.kv).rigidBusPhaseSpacingM, hd * 0.8) : 0;
+  const spacing = it.kv > 0 ? Math.min(clearanceClassFor(it.kv).rigidBusPhaseSpacingM, hd * 0.8) : 0;
   const phases = [-spacing, 0, spacing];
   const hi = o.detail === 'high';
 

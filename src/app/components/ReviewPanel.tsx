@@ -1,5 +1,5 @@
 import { SCHEMES } from '../../engine/schemes';
-import { transformerTopRatingKVA } from '../../engine/equipment';
+import { transformerSiteRatingKVA } from '../../engine/equipment';
 import type { DesignReview } from '../../engine/review';
 import type { Design, Finding, LevelDef } from '../../engine/types';
 import { CiteLink, money } from './Inspector';
@@ -68,7 +68,7 @@ export function ReviewPanel({ review, level, design, stale, onFocus }: { review:
         <div class="metric">
           <span>Transformer capacity (top rating)</span>
           <b>
-            {xfmrs.map((t) => (transformerTopRatingKVA(t) / 1000).toFixed(1)).join(' + ')}{' '}
+            {xfmrs.map((t) => (transformerSiteRatingKVA(t) / 1000).toFixed(1)).join(' + ')}{' '}
             MVA
           </b>
         </div>

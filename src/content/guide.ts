@@ -5,6 +5,8 @@
  */
 import type { Citation } from '../data/bulletin/types';
 import { VOLTAGE_CLASSES, VOLTAGE_CLASS_CITES } from '../data/bulletin/voltageClasses';
+import { bilAltitudeFactor } from '../data/bulletin/insulatorsConductors';
+import { ALTITUDE_CITES, clearanceClassFor } from '../engine/site';
 import { EVENT_ASSUMPTIONS, RATES } from '../engine/reliability';
 import { SCHEMES } from '../engine/schemes';
 import { FIXED_ANGLE, SHIELD_WIRE_LINE_EXTENSION_M, SHIELD_WIRE_MAX_TENSION_N } from '../engine/lightning';
@@ -225,6 +227,27 @@ export const BASE_ARTICLES: GuideArticle[] = [
         },
       },
       { p: 'Post-type insulators are the type most used for new construction and are recommended for new work; polymer posts are less rigid and are not recommended for switch supports.' },
+    ],
+  },
+  {
+    id: 'high-altitude',
+    title: 'Building at high altitude',
+    category: 'Site',
+    cites: [ALTITUDE_CITES.clearances, ALTITUDE_CITES.bil, ALTITUDE_CITES.transformer, ALTITUDE_CITES.breaker, ALTITUDE_CITES.recloser, ALTITUDE_CITES.switch, ALTITUDE_CITES.bus],
+    tags: ['altitude', 'bil', 'clearance', 'derating'],
+    body: [
+      { p: 'Equipment ratings and the clearances of Tables 4-7 and 4-8 apply at 1000 m (3300 ft) or less. Thin air insulates less, so above 1000 m the bulletin derates insulation (BIL) by the factors of Table 4-3.' },
+      {
+        table: {
+          head: ['Altitude', 'BIL factor', '115 kV: BIL needed', 'BIL selected'],
+          rows: [1000, 1500, 1800, 2400, 3000].map((m) => [`${m} m (${Math.round(m * 3.2808)} ft)`, bilAltitudeFactor(m).toFixed(2), `${Math.ceil(550 / bilAltitudeFactor(m))} kV`, `${clearanceClassFor(115, m).bilKV} kV`]),
+          caption: 'The procedure of §4.9: derate the standard BILs, then select the standard BIL whose derated value still gives the system BIL, and use the clearances listed for that BIL. The 2400 m row is the bulletin’s own example (Table 4-9).',
+          cite: ALTITUDE_CITES.clearances,
+        },
+      },
+      { p: 'The game applies this automatically on high-altitude sites: footprints, phase spacings, bus heights and clearance checks use the selected BIL, and equipment is priced at that insulation class. As an alternative the bulletin lets the engineer keep the standard BIL when surge arresters can still protect the derated insulation with adequate margin; the game does not model that option.' },
+      { p: 'Thin air also cools less. Transformer ratings derate by Table 5-2 (0.5% per 100 m above 1000 m for forced-air ratings, 0.4% for self-cooled). Breakers (Table 5-25), air switches (Table 5-41), reclosers (Table 5-59), regulators (Table 5-34) and bus (Table 4-10) lose a little continuous-current capability, and reclosers and breakers have their rated maximum voltage multiplied by the voltage factor, so a higher voltage class may be needed.' },
+      { note: 'Fence clearance dimension A of Fig. 4-21 has its own rule: for 115 kV and above it increases 3% per 300 m (1000 ft) above 1000 m.' },
     ],
   },
   {

@@ -8,12 +8,13 @@ import { checkPhysical } from './checks/physical';
 import { checkProtection } from './checks/protection';
 import { checkRatings } from './checks/ratings';
 import { designCost, type CostBreakdown } from './costs';
-import { transformerTopRatingKVA } from './equipment';
+import { transformerSiteRatingKVA } from './equipment';
 import { checkGrounding, evaluateGrounding, type GroundingResult } from './grounding';
 import { evaluateShielding, SHIELDING_CITES, type ShieldingResult } from './lightning';
 import { evaluateReliability, type ReliabilityResult } from './reliability';
 import { recognizeScheme, type SchemeId } from './schemes';
 import { analyzeTopology, type Topology } from './topology';
+import { ALTITUDE_CITES, clearanceClassFor, isHighAltitude, setSiteAltitude, siteBilFactor, transformerSiteFactor } from './site';
 import type { Design, Finding, LevelDef, Objective, Severity } from './types';
 import { voltageClassFor } from '../data/bulletin/voltageClasses';
 
@@ -46,6 +47,7 @@ export interface DesignReview {
 const SEV_ORDER: Record<Severity, number> = { critical: 0, major: 1, minor: 2, info: 3 };
 
 export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingMethod?: 'fixed_angle' | 'rolling_sphere' } = {}): DesignReview {
+  setSiteAltitude(level.site.altitudeM);
   const topo = analyzeTopology(design, level);
   const facts = analyzeElectrical(design, level, topo);
   const calc = computeStation(design, level, topo);
@@ -54,6 +56,7 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
   findings.push(...checkElectrical(design, level, topo, facts));
   findings.push(...checkProtection(design, level, topo, facts));
   findings.push(...checkRatings(design, level, topo, calc));
+  if (isHighAltitude(level.site.altitudeM)) findings.push(altitudeNote(level));
 
   // Lightning shielding.
   const method = opts.shieldingMethod ?? design.shieldingMethod;
@@ -151,7 +154,7 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
           xf.every((t) => {
             const reach = topo.reach({ open: new Set([t.id]), closeNormallyOpen: true });
             const servedAll = topo.loads.every((l) => !l.node || reach.has(l.node));
-            const remaining = xf.filter((x) => x !== t).reduce((s, x) => s + transformerTopRatingKVA(x) / 1000, 0);
+            const remaining = xf.filter((x) => x !== t).reduce((s, x) => s + transformerSiteRatingKVA(x) / 1000, 0);
             return servedAll && remaining >= calc.loadNowMVA;
           });
         break;
@@ -165,6 +168,9 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         break;
       case 'arresters':
         met = !has('surge.');
+        break;
+      case 'clearances':
+        met = !has('clear.') && !has('fence.clearance');
         break;
       case 'capacitor_kvar': {
         const kvar = design.items.filter((i) => i.kind === 'capacitor_bank').reduce((s, c) => s + Number(c.props.kvar), 0);
@@ -207,4 +213,26 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
     ),
   );
   return { findings, counts, objectives, cost, calc, topo, facts, shielding, grounding, reliability, scheme, scoredSaidi, passed, stars, score, blockers };
+}
+
+/** Explains what the site altitude changes (an info finding, shown on high-altitude sites). */
+function altitudeNote(level: LevelDef): Finding {
+  const alt = level.site.altitudeM;
+  const f = siteBilFactor(alt);
+  const kvs = [level.system.hvKV, ...(level.system.lvKV !== undefined ? [level.system.lvKV] : [])];
+  const parts = kvs.map((kv) => {
+    const std = voltageClassFor(kv);
+    const sel = clearanceClassFor(kv, alt);
+    return sel.bilKV === std.bilKV ? `${kv} kV keeps its ${std.bilKV} kV BIL` : `${kv} kV equipment is specified at ${sel.bilKV} kV BIL instead of ${std.bilKV} kV (${std.bilKV} ÷ ${f.toFixed(2)} needs ${Math.ceil(std.bilKV / f)} kV) and laid out with the ${sel.nominalKV} kV-class clearances of Table 4-7`;
+  });
+  const derate = (100 * (1 - transformerSiteFactor(true, alt))).toFixed(1);
+  return {
+    id: 'site.altitude#1',
+    checkId: 'site.altitude',
+    severity: 'info',
+    category: 'clearance',
+    title: `High-altitude site: ${alt} m (${Math.round(alt * 3.2808)} ft)`,
+    detail: `Thin air insulates and cools less. Table 4-3 derates insulation by ${f.toFixed(2)} here, so ${parts.join('; ')}. Fan-cooled transformer ratings derate ${derate}% (Table 5-2), and breaker, switch, recloser, regulator and bus current ratings are reduced by Tables 5-25, 5-41, 5-59, 5-34 and 4-10.`,
+    cite: [ALTITUDE_CITES.clearances, ALTITUDE_CITES.bil, ALTITUDE_CITES.transformer],
+  };
 }

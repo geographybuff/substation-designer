@@ -211,7 +211,8 @@ export type ObjectiveKind =
   | 'line_protection'
   | 'arresters'
   | 'capacitor_kvar'
-  | 'removal_path';
+  | 'removal_path'
+  | 'clearances';
 
 export interface Objective {
   id: string;

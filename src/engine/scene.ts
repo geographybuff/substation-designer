@@ -3,7 +3,7 @@
  * Plan coordinates (x east, y south) and heights in metres.
  */
 import { busHeight, CATALOG } from './catalog';
-import { voltageClassFor } from '../data/bulletin/voltageClasses';
+import { clearanceClassFor } from './site';
 import { footprintOf, itemRect } from './items';
 import type { ConductorElevation, Design, ItemKind, LevelDef, Props, Rect, Rotation, SurfacingMaterial, Vec2, Vec3 } from './types';
 
@@ -58,7 +58,7 @@ export function buildSceneModel(design: Design, level: LevelDef, energizedNodeId
     const fp = footprintOf(it);
     const rect = itemRect(it, fp);
     const def = CATALOG[it.kind];
-    const phaseSpacing = it.kv > 0 ? voltageClassFor(it.kv).rigidBusPhaseSpacingM : 0;
+    const phaseSpacing = it.kv > 0 ? clearanceClassFor(it.kv).rigidBusPhaseSpacingM : 0;
     return {
       id: it.id,
       kind: it.kind,
@@ -80,7 +80,7 @@ export function buildSceneModel(design: Design, level: LevelDef, energizedNodeId
     id: c.id,
     points: c.points,
     height: busHeight(c.kv, c.elevation),
-    phaseSpacing: voltageClassFor(c.kv).rigidBusPhaseSpacingM,
+    phaseSpacing: clearanceClassFor(c.kv).rigidBusPhaseSpacingM,
     kv: c.kv,
     elevation: c.elevation,
     energized: isOn(c.id),

@@ -4,7 +4,8 @@
  */
 import { CONDUCTOR_SIZES } from '../catalog';
 import { transformerHVCurrentA, type StationCalc } from '../calc';
-import { isStandardRecloserRating, RECLOSER_TABLE_CITES, regulatorCapacityA, regulatorRangeMultiplier, transformerTopRatingKVA } from '../equipment';
+import { isStandardRecloserRating, RECLOSER_TABLE_CITES, regulatorCapacityA, regulatorRangeMultiplier, transformerSiteRatingKVA, transformerTopRatingKVA } from '../equipment';
+import { ALTITUDE_CITES, currentSiteFactor, isHighAltitude, siteAltitudeM } from '../site';
 import { itemLabel } from '../items';
 import type { Topology } from '../topology';
 import type { Design, Finding, LevelDef } from '../types';
@@ -23,12 +24,14 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
     if (it.kind === 'transformer') {
       const load = calc.transformerLoadMVA.get(it.id);
       if (!load) continue;
-      const topMVA = transformerTopRatingKVA(it) / 1000;
+      const topMVA = transformerSiteRatingKVA(it) / 1000;
       const oaMVA = Number(it.props.kva) / 1000;
+      const derated = isHighAltitude() ? ` (nameplate ${(transformerTopRatingKVA(it) / 1000).toFixed(1)} MVA derated for ${siteAltitudeM()} m altitude, Table 5-2)` : '';
+      const altCite = isHighAltitude() ? [ALTITUDE_CITES.transformer] : [];
       if (load.now > topMVA * 1.0001) {
-        out.push({ id: fid('rating.xfmr.now'), checkId: 'rating.xfmr.now', severity: 'critical', category: 'ratings', title: `${itemLabel(it)} is overloaded on day one`, detail: `Peak load ${load.now.toFixed(1)} MVA exceeds its top rating of ${topMVA.toFixed(1)} MVA (${it.props.cooling}).`, itemIds: [it.id], cite: [{ page: 193, section: '5.2.3' }] });
+        out.push({ id: fid('rating.xfmr.now'), checkId: 'rating.xfmr.now', severity: 'critical', category: 'ratings', title: `${itemLabel(it)} is overloaded on day one`, detail: `Peak load ${load.now.toFixed(1)} MVA exceeds its top rating of ${topMVA.toFixed(1)} MVA (${it.props.cooling})${derated}.`, itemIds: [it.id], cite: [{ page: 193, section: '5.2.3' }, ...altCite] });
       } else if (load.horizon > topMVA * 1.0001) {
-        out.push({ id: fid('rating.xfmr.horizon'), checkId: 'rating.xfmr.horizon', severity: 'major', category: 'ratings', title: `${itemLabel(it)} will be overloaded within ${H} years`, detail: `Forecast peak ${load.horizon.toFixed(1)} MVA in year ${H} exceeds its top rating of ${topMVA.toFixed(1)} MVA. Plan for the long-range forecast: a larger unit or more fan stages.`, itemIds: [it.id], cite: [{ page: 41, section: '2.1' }, { page: 193, section: '5.2.3' }] });
+        out.push({ id: fid('rating.xfmr.horizon'), checkId: 'rating.xfmr.horizon', severity: 'major', category: 'ratings', title: `${itemLabel(it)} will be overloaded within ${H} years`, detail: `Forecast peak ${load.horizon.toFixed(1)} MVA in year ${H} exceeds its top rating of ${topMVA.toFixed(1)} MVA${derated}. Plan for the long-range forecast: a larger unit or more fan stages.`, itemIds: [it.id], cite: [{ page: 41, section: '2.1' }, { page: 193, section: '5.2.3' }, ...altCite] });
       } else if (load.horizon < oaMVA * 0.35) {
         out.push({ id: fid('rating.xfmr.oversized'), checkId: 'rating.xfmr.oversized', severity: 'info', category: 'ratings', title: `${itemLabel(it)} is lightly loaded`, detail: `Forecast peak is only ${Math.round((100 * load.horizon) / oaMVA)}% of its self-cooled rating; a smaller unit would save money.`, itemIds: [it.id] });
       }
@@ -59,7 +62,9 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
     }
     // --- Continuous current ratings ------------------------------------------------------
     if (it.kind === 'breaker' || it.kind === 'recloser' || it.kind === 'switch' || it.kind === 'hookstick_switch' || it.kind === 'circuit_switcher') {
-      const rating = Number(it.props.continuousA) || 0;
+      const nameplate = Number(it.props.continuousA) || 0;
+      const f = currentSiteFactor(it.kind);
+      const rating = nameplate * f;
       if (amps > rating + 1e-6) {
         out.push({
           id: fid('rating.continuous'),
@@ -67,13 +72,14 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
           severity: 'major',
           category: 'ratings',
           title: `${itemLabel(it)} continuous rating too low`,
-          detail: `It will carry about ${Math.round(amps)} A at the year-${H} peak but is rated ${rating} A.`,
+          detail: `It will carry about ${Math.round(amps)} A at the year-${H} peak but is rated ${f < 1 ? `${Math.round(rating)} A at this altitude (${nameplate} A × ${f.toFixed(3)})` : `${rating} A`}.`,
           itemIds: [it.id],
+          cite: f < 1 ? [it.kind === 'recloser' ? ALTITUDE_CITES.recloser : it.kind === 'switch' || it.kind === 'hookstick_switch' ? ALTITUDE_CITES.switch : ALTITUDE_CITES.breaker] : undefined,
         });
       }
     }
     if (it.kind === 'regulator') {
-      const cap = regulatorCapacityA(it);
+      const cap = regulatorCapacityA(it) * currentSiteFactor('regulator');
       if (amps > cap + 1e-6) {
         const mult = regulatorRangeMultiplier(Number(it.props.rangePct));
         out.push({
@@ -84,7 +90,7 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
           title: `${itemLabel(it)} is too small`,
           detail: `Load current ≈ ${Math.round(amps)} A at year ${H}; at ±${it.props.rangePct}% regulation the bank carries ${Math.round(cap)} A (${Math.round(mult * 100)}% of its ±10% rating). Choose a larger rating or a narrower range.`,
           itemIds: [it.id],
-          cite: [{ page: 257, section: '5.5.3', table: '5-28' }],
+          cite: [{ page: 257, section: '5.5.3', table: '5-28' }, ...(isHighAltitude() ? [ALTITUDE_CITES.regulator] : [])],
         });
       }
     }
@@ -109,8 +115,9 @@ export function checkRatings(design: Design, level: LevelDef, topo: Topology, ca
     if (!n) continue;
     const amps = calc.nodeCurrentA.get(n) ?? 0;
     const size = CONDUCTOR_SIZES.find((s) => s.key === c.size) ?? CONDUCTOR_SIZES[0]!;
-    if (amps > size.ampacityA) {
-      out.push({ id: fid('rating.bus'), checkId: 'rating.bus', severity: 'major', category: 'ratings', title: 'Bus conductor too small', detail: `About ${Math.round(amps)} A flows here; ${size.label} is good for ${size.ampacityA} A.`, conductorIds: [c.id], cite: [{ page: 160, section: '4.10.4' }] });
+    const ampacity = size.ampacityA * currentSiteFactor('bus');
+    if (amps > ampacity) {
+      out.push({ id: fid('rating.bus'), checkId: 'rating.bus', severity: 'major', category: 'ratings', title: 'Bus conductor too small', detail: `About ${Math.round(amps)} A flows here; ${size.label} is good for ${Math.round(ampacity)} A${isHighAltitude() ? ' at this altitude (Table 4-10)' : ''}.`, conductorIds: [c.id], cite: [{ page: 160, section: '4.10.4' }, ...(isHighAltitude() ? [ALTITUDE_CITES.bus] : [])] });
     }
   }
   return out;

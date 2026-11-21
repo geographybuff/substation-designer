@@ -5,6 +5,7 @@
  */
 import { CATALOG, defaultProps } from '../engine/catalog';
 import { newDesign } from '../engine/design';
+import { setSiteAltitude } from '../engine/site';
 import type { Conductor, Design, ItemKind, PlacedItem, Props, Rotation } from '../engine/types';
 import { getLevel } from '.';
 
@@ -115,7 +116,9 @@ function l3Layout(d: Design): void {
 }
 
 function withLevel(levelId: string, build: (d: Design) => void): Design {
-  const d = newDesign(getLevel(levelId)!);
+  const level = getLevel(levelId)!;
+  setSiteAltitude(level.site.altitudeM);
+  const d = newDesign(level);
   build(d);
   return d;
 }
@@ -287,7 +290,33 @@ export const SOLUTIONS: Record<string, () => Design> = {
       d.groundGrid = { ...d.groundGrid, ...L7_GRID };
       d.surfacing = { material: 'crushed_rock', thicknessM: 0.1 };
     }),
+  'l8-thin-air': () =>
+    withLevel('l8-thin-air', (d) => {
+      const HV = 115;
+      const LV = 24.9;
+      const y = 19.5;
+      d.items.push(
+        it('S1', 'switch', 8, y - halfDepth('switch', HV), HV, {}, 0, 'Line disconnect'),
+        it('CS1', 'circuit_switcher', 14, y - halfDepth('circuit_switcher', HV), HV, {}, 0, 'T1 circuit switcher'),
+        it('T1', 'transformer', 21.5, y - halfDepth('transformer', HV), HV, { kva: 12000, cooling: 'OA/FA', lvKV: LV, ltc: true, arresters: 'hv_lv', relays: ['87T', '63', '50/51'] }, 0, 'T1'),
+        it('LA1', 'arrester', 3.25, 25, HV, { class: 'station' }, 1, 'Line entrance arresters'),
+      );
+      d.conductors.push(bus('H1', HV, [4.5, y], [8, y]), bus('H1t', HV, [6.25, y], [6.25, 25]), bus('H2', HV, [11.5, y], [14, y]), bus('H3', HV, [18.5, y], [21.5, y]), bus('L1', LV, [28.5, y], [32, y]), bus('LB', LV, [32, 10], [32, 26]));
+      const names = ['Feeder 1 — Summit Village', 'Feeder 2 — Ski Area'];
+      [14, 26].forEach((fy, i) => {
+        const b = feederBay(i + 1, fy, names[i]!, { busX: 32, x0: 34, bypass: true, kv: LV });
+        d.items.push(...b.items);
+        d.conductors.push(...b.conductors);
+      });
+      d.items.push(...L8_MASTS.map(([x, yy, h], i) => it(`M${i + 1}`, 'mast', x, yy, 0, { heightM: h })));
+      d.fence = { rect: { x: 0.5, y: 5.5, w: 52, h: 28 }, gate: { side: 'S', offset: 20, width: 6 } };
+      d.groundGrid = { ...d.groundGrid, ...L8_GRID };
+      d.surfacing = { material: 'crushed_rock', thicknessM: 0.1 };
+    }),
 };
+
+export const L8_MASTS: Array<[number, number, number]> = [[37.5, 18.5, 22], [10.5, 24.5, 22], [37.5, 6.5, 22], [40.5, 18.5, 22], [1.5, 6.5, 22]];
+export const L8_GRID = { enabled: true, spacingM: 4, conductor: '4/0' as const, depthM: 0.5, rodCount: 20, rodLengthM: 3, extendBeyondFenceM: 1.25, fenceBonded: true };
 
 /** Ground grid and surfacing for the L6 solution (cheapest safe option from a parameter sweep). */
 export const L6_GRID = { enabled: true, spacingM: 3, conductor: '4/0' as const, depthM: 0.5, rodCount: 20, rodLengthM: 3, extendBeyondFenceM: 1.25, fenceBonded: true };
