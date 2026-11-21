@@ -6,6 +6,27 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
+### Added
+- Project 7, *Ring Around*: a 115 kV ring-bus switching station with four lines and no
+  transformation. Line protection is checked per protection zone, so meshed schemes (ring bus,
+  breaker-and-a-half) are judged by the set of breakers that isolates each line or source
+  (sections 4.6.4 and 12.4.2).
+- Project 8, *Thin Air*: a 115/24.9 kV station at 2400 m (8000 ft), the bulletin's own worked example.
+- High-altitude corrections above 1000 m (3300 ft): standard BILs are derated by Table 4-3 and the
+  clearances of the selected BIL are used (section 4.9, Table 4-9), so footprints, bus heights and
+  clearance checks grow; equipment is priced at the higher insulation class. Transformer ratings
+  derate per Table 5-2, continuous-current ratings per Tables 5-25, 5-41, 5-59, 5-34 and 4-10, and
+  reclosers need a higher voltage class per the Table 5-59 voltage factor. A Field Guide article
+  explains the procedure.
+- Standard recloser ratings from Tables 5-60 (oil) and 5-61 (vacuum), chosen in the Inspector.
+- Arrester MCOV selection (Eq. 5-7) and lightning protective margin check (section 5.8.7), shown in
+  the Inspector.
+- Chapter 3 design-process data and research notes; the 4 in. (0.10 m) minimum surface-layer
+  thickness (section 9.10.2).
+- New objective type: keep the (altitude-corrected) clearances.
+
 ## [0.2.0] - 2026-11-21
 
 ### Added
