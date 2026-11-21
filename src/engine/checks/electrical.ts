@@ -268,13 +268,6 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
       cite: [{ page: 673, section: '15.1' }],
     });
   }
-  for (const b of design.items.filter((i) => i.kind === 'breaker')) {
-    const relays = (b.props.relays as string[] | undefined) ?? [];
-    if (!relays.length) {
-      out.push({ id: fid('prot.relays'), checkId: 'prot.relays', severity: 'major', category: 'protection', title: `${itemLabel(b)} has no protective relays`, detail: 'A breaker only opens when a relay tells it to. Assign relays in the inspector.', itemIds: [b.id], cite: [{ page: 601, section: '12.1' }] });
-    }
-  }
-
   // Isolation switches for breakers/reclosers.
   for (const [id, ok] of facts.isolable) {
     if (!ok) {

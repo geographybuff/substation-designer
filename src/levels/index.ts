@@ -1,7 +1,7 @@
 import type { LevelDef } from '../engine/types';
-import { L1_FIRST_LIGHT, L2_KEEP_LIGHTS_ON, L3_THUNDERSTORM_ALLEY, SANDBOX } from './campaign';
+import { L1_FIRST_LIGHT, L2_KEEP_LIGHTS_ON, L3_THUNDERSTORM_ALLEY, L4_MOBILE_READY, L5_GROWING_PAINS, SANDBOX } from './campaign';
 
-export const CAMPAIGN: LevelDef[] = [L1_FIRST_LIGHT, L2_KEEP_LIGHTS_ON, L3_THUNDERSTORM_ALLEY].sort((a, b) => a.order - b.order);
+export const CAMPAIGN: LevelDef[] = [L1_FIRST_LIGHT, L2_KEEP_LIGHTS_ON, L3_THUNDERSTORM_ALLEY, L4_MOBILE_READY, L5_GROWING_PAINS].sort((a, b) => a.order - b.order);
 export const ALL_LEVELS: LevelDef[] = [...CAMPAIGN, SANDBOX];
 
 export function getLevel(id: string): LevelDef | undefined {

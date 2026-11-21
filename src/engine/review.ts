@@ -5,6 +5,7 @@
 import { computeStation, type StationCalc } from './calc';
 import { analyzeElectrical, checkElectrical, type ElectricalFacts } from './checks/electrical';
 import { checkPhysical } from './checks/physical';
+import { checkProtection } from './checks/protection';
 import { checkRatings } from './checks/ratings';
 import { designCost, type CostBreakdown } from './costs';
 import { transformerTopRatingKVA } from './equipment';
@@ -51,6 +52,7 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
   const findings: Finding[] = [];
   findings.push(...checkPhysical(design, level, topo));
   findings.push(...checkElectrical(design, level, topo, facts));
+  findings.push(...checkProtection(design, level, topo, facts));
   findings.push(...checkRatings(design, level, topo, calc));
 
   // Lightning shielding.
