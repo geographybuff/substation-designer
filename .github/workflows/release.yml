@@ -1,0 +1,110 @@
+name: Release
+
+# Publishes a GitHub Release with Windows and web builds for every v* tag.
+# Every release build requires license acceptance: the installer shows the
+# license page, and the game blocks play until the license is accepted. The
+# verify job fails the release if either safeguard is missing.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: ver
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:web
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: License gate and gameplay smoke test (desktop bundle)
+        run: npm run e2e
+      - name: License gate and gameplay smoke test (web build)
+        run: npm run e2e:web
+      - name: Editor interaction test
+        run: npm run e2e:interaction
+      - name: Release gate - license acceptance enforced
+        run: |
+          node scripts/prepare-build.mjs
+          npm run verify:release
+      - name: Package web build
+        run: |
+          mkdir -p out
+          cp dist-web/index.html "out/SubstationDesigner-${{ steps.ver.outputs.version }}-web.html"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: out/*
+          if-no-files-found: error
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build
+      - run: node scripts/prepare-build.mjs
+      - run: node scripts/verify-release.mjs
+      - name: Build Windows installer, portable exe and zip
+        run: npx electron-builder --win --x64 --publish never
+      - name: Check license ships with the app
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "release/win-unpacked/LICENSE.txt")) { throw "LICENSE.txt missing from packaged app" }
+          Get-ChildItem release -File | Format-Table Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            release/*.exe
+            release/*.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [verify, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Release notes
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" artifacts/SHA256SUMS.txt > notes.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --title "Substation Designer $GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            --verify-tag

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Substation Designer - 3D view harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1d2125;
+        font: 13px/1.35 system-ui, sans-serif;
+      }
+      #view {
+        position: fixed;
+        inset: 0;
+      }
+      #ui {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: rgba(22, 26, 30, 0.82);
+        color: #e8ecef;
+        user-select: none;
+        max-width: 460px;
+      }
+      #ui button {
+        font: inherit;
+        margin: 0 4px 4px 0;
+        padding: 3px 9px;
+        border: 1px solid #56606a;
+        border-radius: 4px;
+        background: #2c333a;
+        color: inherit;
+        cursor: pointer;
+      }
+      #ui button.on {
+        background: #c8961e;
+        border-color: #e7b53b;
+        color: #111;
+      }
+      #ui label {
+        margin-right: 10px;
+      }
+      #stats {
+        margin-top: 4px;
+        font-family: ui-monospace, monospace;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="ui"></div>
+    <script type="module" src="/src/render3d/harness.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "name": "substation-designer",
+  "productName": "Substation Designer",
+  "version": "0.3.0",
+  "description": "A rural substation design game grounded in USDA RUS Bulletin 1724E-300, Design Guide for Rural Substations.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "geographybuff",
+  "homepage": "https://github.com/geographybuff/substation-designer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geographybuff/substation-designer.git"
+  },
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "build:web": "vite build --mode singlefile",
+    "preview": "vite preview",
+    "e2e": "node e2e/smoke.mjs dist",
+    "e2e:web": "node e2e/smoke.mjs dist-web/index.html",
+    "icon": "node scripts/make-icon.mjs",
+    "prepare:build": "node scripts/prepare-build.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
+    "electron": "electron .",
+    "dist:win": "vite build && node scripts/prepare-build.mjs && electron-builder --win --x64 --publish never",
+    "dist:dir": "vite build && node scripts/prepare-build.mjs && electron-builder --dir --publish never",
+    "e2e:interaction": "node e2e/interaction.mjs dist"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/three": "0.186.0",
+    "electron": "43.8.7",
+    "electron-builder": "26.18.0",
+    "playwright": "1.63.0",
+    "preact": "10.29.8",
+    "three": "0.186.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-singlefile": "2.3.4",
+    "vitest": "4.1.12"
+  }
+}

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:web
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end smoke test (desktop bundle)
+        run: npm run e2e
+      - name: End-to-end smoke test (single-file web build)
+        run: npm run e2e:web
+      - name: Editor interaction test
+        run: npm run e2e:interaction
+      - name: License enforcement checks
+        run: |
+          node scripts/prepare-build.mjs
+          npm run verify:release
