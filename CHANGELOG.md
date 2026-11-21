@@ -25,6 +25,8 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 - Field Guide articles on grounding, relaying, arresters, reclosers, instrument transformers, site
   design, auxiliary systems, automation and communications, maintenance, and each bus scheme.
 - Cited data for Chapters 6, 9, 12, 14-21 and sections 5.8-5.11.
+- Arrester class check (station, intermediate, distribution; section 5.8.2).
+- Mouse-driven editor interaction test in CI and the release gate.
 
 ### Changed
 - Transformer impedances from Table 5-11 and fan-cooled ratings from section 5.2.2; regulator

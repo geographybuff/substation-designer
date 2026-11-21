@@ -36,7 +36,7 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
   The release workflow then builds and publishes. Planned tags are listed in CHANGELOG.md.
 
 ## Planned tags (create from the repo owner's machine)
-- v0.1.0 → commit 2da59f1 (first playable). v0.2.0 → the "Release 0.2.0" commit.
+- v0.1.0 → commit 2da59f1 (first playable). v0.2.0 → the "Finalize 0.2.0 changelog" commit.
 
 ## TODO (in priority order)
 1. Commit agent B's final edits (designProcess.ts, docs/research/civil-protection-notes.md) when it reports.
