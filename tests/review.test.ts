@@ -18,9 +18,13 @@ describe('design review of the reference substation', () => {
   it('is fully shielded by its masts', () => {
     expect(r.shielding.coveredFraction).toBe(1);
   });
-  it('computes LV fault level from source and transformer impedance', () => {
+  it('computes LV fault level from source and Table 5-11 transformer impedance', () => {
+    // 69 kV (350 kV BIL) transformer without LTC: 8.0% on its 10 MVA OA base (Table 5-11).
+    // Zs = 100 / (sqrt3 * 69 * 8) = 0.1046 pu, Zt = 0.08 * 100/10 = 0.8 pu (100 MVA base).
+    const expected = 100 / (Math.sqrt(3) * 12.47) / (100 / (Math.sqrt(3) * 69 * 8) + 0.8);
     const lvNode = r.topo.nodeOfPort.get('T1:lv')!;
-    expect(r.calc.faultKA.get(lvNode)).toBeCloseTo(5.58, 1);
+    expect(r.calc.faultKA.get(lvNode)).toBeCloseTo(expected, 6);
+    expect(expected).toBeCloseTo(5.12, 2);
   });
 });
 

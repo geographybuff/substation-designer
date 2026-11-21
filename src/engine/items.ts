@@ -34,5 +34,5 @@ export function itemPorts(item: PlacedItem, fp: Footprint = footprintOf(item)): 
 }
 
 export function itemLabel(item: PlacedItem): string {
-  return item.label ?? `${CATALOG[item.kind].tag} ${item.id.replace(/^\D+/, '')}`;
+  return item.label ?? item.id;
 }

@@ -264,6 +264,8 @@ export interface LevelDef {
   starter?: Partial<Pick<Design, 'items' | 'conductors' | 'fence' | 'groundGrid' | 'surfacing'>>;
   /** Sandbox levels unlock everything and skip objectives. */
   sandbox?: boolean;
+  /** Check-id prefixes switched off to keep early levels focused (e.g. "surge.", "shield."). */
+  checksOff?: string[];
 }
 
 // ---------------------------------------------------------------------------

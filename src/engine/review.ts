@@ -80,6 +80,10 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
   const cost = designCost(design, level);
   const scheme = recognizeScheme(design, level, topo);
 
+  if (level.checksOff?.length) {
+    const off = level.checksOff;
+    for (let i = findings.length - 1; i >= 0; i--) if (off.some((p) => findings[i]!.checkId.startsWith(p))) findings.splice(i, 1);
+  }
   findings.sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
   const counts: Record<Severity, number> = { critical: 0, major: 0, minor: 0, info: 0 };
   for (const f of findings) counts[f.severity]++;

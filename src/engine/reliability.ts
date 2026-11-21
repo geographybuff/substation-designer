@@ -10,6 +10,7 @@
  * schemes (§4.6), shielding (§4.7.3) and surge arresters (§4.3.5).
  */
 import type { StationCalc } from './calc';
+import { transformerTopRatingKVA } from './equipment';
 import { polylineLength } from './geometry';
 import type { ElectricalFacts } from './checks/electrical';
 import { isProtective, type TEndpoint, type Topology } from './topology';
@@ -77,6 +78,13 @@ export interface OutageContribution {
   planned: boolean;
   /** Outside the player's control (e.g. the only supply line); shown but not scored. */
   external?: boolean;
+  /** Events per year. */
+  ratePerYear: number;
+  /** Customer-minutes per event. */
+  perEvent: number;
+  /** Customers interrupted per event. */
+  customers: number;
+  kind: 'failure' | 'maintenance' | 'feeder' | 'line' | 'lightning' | 'surge' | 'bus';
 }
 
 export interface ReliabilityResult {
@@ -133,7 +141,7 @@ export function evaluateReliability(
     // Overloaded transformers age faster (game rule).
     if (it.kind === 'transformer') {
       const load = calc.transformerLoadMVA.get(it.id);
-      const top = Number(it.props.kva) / 1000; // OA basis for ageing pressure
+      const top = transformerTopRatingKVA(it) / 1000;
       if (load && load.horizon > top) lambda *= 1 + 2 * (load.horizon / top - 1);
     }
     const clearer = isProtective(it.kind) ? clearingDevice(it.id) : (clearingDevice(it.id) ?? null);
@@ -155,7 +163,7 @@ export function evaluateReliability(
       else hours = r.repairHours;
       cm += l.customers * hours * 60;
     }
-    contributions.push({ cause: `${it.label ?? it.id} failure`, itemId: it.id, customerMinutes: lambda * cm, planned: false });
+    contributions.push({ cause: `${it.label ?? it.id} failure`, itemId: it.id, customerMinutes: lambda * cm, planned: false, ratePerYear: lambda, perEvent: cm, customers: interrupted.reduce((s2, l) => s2 + l.customers, 0), kind: 'failure' });
   }
 
   // --- Planned maintenance ----------------------------------------------------------
@@ -171,7 +179,8 @@ export function evaluateReliability(
       cut = served.filter((l) => !reach.has(l.node!));
     }
     if (cut.length) {
-      contributions.push({ cause: `${it.label ?? it.id} maintenance`, itemId: it.id, customerMinutes: minutesFor(cut, r.maintenanceHours) / r.maintenanceYears, planned: true });
+      const per = minutesFor(cut, r.maintenanceHours);
+      contributions.push({ cause: `${it.label ?? it.id} maintenance`, itemId: it.id, customerMinutes: per / r.maintenanceYears, planned: true, ratePerYear: 1 / r.maintenanceYears, perEvent: per, customers: cut.reduce((s2, l) => s2 + l.customers, 0), kind: 'maintenance' });
     }
   }
 
@@ -185,13 +194,14 @@ export function evaluateReliability(
       // Cleared by an upstream device that also drops other feeders.
       const reached = topo.reach({ open: new Set(topo.devices.filter((x) => isProtective(x.kind) && x.closed).map((x) => x.itemId)) });
       const victims = served.filter((o) => o !== l && !reached.has(o.node!));
-      contributions.push({ cause: `${items.get(l.itemId)?.label ?? l.itemId}: feeder faults trip shared protection`, itemId: l.itemId, customerMinutes: (temp + perm) * minutesFor(victims, EVENT_ASSUMPTIONS.manualRestoreHours) + temp * minutesFor([l], EVENT_ASSUMPTIONS.manualRestoreHours), planned: false });
+      const cmTotal = (temp + perm) * minutesFor(victims, EVENT_ASSUMPTIONS.manualRestoreHours) + temp * minutesFor([l], EVENT_ASSUMPTIONS.manualRestoreHours);
+      contributions.push({ cause: `${items.get(l.itemId)?.label ?? l.itemId}: feeder faults trip shared protection`, itemId: l.itemId, customerMinutes: cmTotal, planned: false, ratePerYear: faults, perEvent: cmTotal / faults, customers: victims.reduce((s2, o) => s2 + o.customers, 0) + l.customers, kind: 'feeder' });
       continue;
     }
     const dev = items.get(prot)!;
     const recloses = dev.kind === 'recloser' ? dev.props.reclosing !== false : ((dev.props.relays as string[] | undefined) ?? []).includes('79');
     if (!recloses) {
-      contributions.push({ cause: `${dev.label ?? dev.id}: no reclosing — temporary faults become outages`, itemId: dev.id, customerMinutes: temp * minutesFor([l], EVENT_ASSUMPTIONS.manualRestoreHours), planned: false });
+      contributions.push({ cause: `${dev.label ?? dev.id}: no reclosing — temporary faults become outages`, itemId: dev.id, customerMinutes: temp * minutesFor([l], EVENT_ASSUMPTIONS.manualRestoreHours), planned: false, ratePerYear: temp, perEvent: minutesFor([l], EVENT_ASSUMPTIONS.manualRestoreHours), customers: l.customers, kind: 'feeder' });
     }
   }
 
@@ -203,7 +213,8 @@ export function evaluateReliability(
     const cut = served.filter((l) => !reach.has(l.node!));
     if (cut.length) {
       const sourceFixtures = level.fixtures.filter((f) => f.kind === 'line_terminal' && f.props.flow !== 'out').length;
-      contributions.push({ cause: `${items.get(s.itemId)?.label ?? s.itemId} outage (single source)`, itemId: s.itemId, customerMinutes: EVENT_ASSUMPTIONS.lineOutagesPerYear * minutesFor(cut, EVENT_ASSUMPTIONS.lineOutageHours), planned: false, external: sourceFixtures < 2 });
+      const per = minutesFor(cut, EVENT_ASSUMPTIONS.lineOutageHours);
+      contributions.push({ cause: `${items.get(s.itemId)?.label ?? s.itemId} outage (single source)`, itemId: s.itemId, customerMinutes: EVENT_ASSUMPTIONS.lineOutagesPerYear * per, planned: false, external: sourceFixtures < 2, ratePerYear: EVENT_ASSUMPTIONS.lineOutagesPerYear, perEvent: per, customers: cut.reduce((s2, l) => s2 + l.customers, 0), kind: 'line' });
     }
   }
 
@@ -215,7 +226,8 @@ export function evaluateReliability(
     const strokes = ng * areaKm2;
     const unprotected = Math.max(0, 1 - shieldingCoverage);
     if (unprotected > 0.0005) {
-      contributions.push({ cause: 'Direct lightning strokes to unshielded equipment', customerMinutes: strokes * unprotected * minutesFor(served, EVENT_ASSUMPTIONS.strokeDamageHours), planned: false });
+      const per = minutesFor(served, EVENT_ASSUMPTIONS.strokeDamageHours);
+      contributions.push({ cause: 'Direct lightning strokes to unshielded equipment', customerMinutes: strokes * unprotected * per, planned: false, ratePerYear: strokes * unprotected, perEvent: per, customers: served.reduce((s2, l) => s2 + l.customers, 0), kind: 'lightning', external: (level.checksOff ?? []).includes('shield.') });
     }
   }
   for (const it of design.items) {
@@ -225,12 +237,13 @@ export function evaluateReliability(
       const reach = topo.reach({ open: new Set([it.id]), closeNormallyOpen: true, mobileConnected: hasMobilePad });
       const cut = served.filter((l) => !reach.has(l.node!));
       const hours = hasMobilePad ? EVENT_ASSUMPTIONS.mobileInstallHours : EVENT_ASSUMPTIONS.mobileUnpreparedHours;
-      contributions.push({ cause: `${it.label ?? it.id}: surge damage without arresters`, itemId: it.id, customerMinutes: EVENT_ASSUMPTIONS.surgeDamagePerYear * minutesFor(cut, hours), planned: false });
+      const per = minutesFor(cut, hours);
+      contributions.push({ cause: `${it.label ?? it.id}: surge damage without arresters`, itemId: it.id, customerMinutes: EVENT_ASSUMPTIONS.surgeDamagePerYear * per, planned: false, ratePerYear: EVENT_ASSUMPTIONS.surgeDamagePerYear, perEvent: per, customers: cut.reduce((s2, l) => s2 + l.customers, 0), kind: 'surge', external: (level.checksOff ?? []).includes('surge.') });
     }
   }
 
   // --- Bus faults (rate proportional to bus length, grouped by voltage) ----------------------
-  const busByKV = new Map<number, number>();
+  const busByKV = new Map<number, { rate: number; cm: number; customers: number }>();
   const condLen = new Map(design.conductors.map((c) => [c.id, polylineLength(c.points)]));
   for (const n of topo.nodes) {
     if (!n.conductorIds.length || !base.has(n.id)) continue;
@@ -241,9 +254,12 @@ export function evaluateReliability(
     const reTie = topo.reach({ open: new Set(devs), closeNormallyOpen: true });
     const cm = cut.reduce((s, l) => s + l.customers * (reTie.has(l.node!) ? swHours : EVENT_ASSUMPTIONS.busRepairHours) * 60, 0);
     const lambda = (EVENT_ASSUMPTIONS.busFaultsPer100m * lengthM) / 100;
-    if (cm > 0) busByKV.set(n.kv, (busByKV.get(n.kv) ?? 0) + lambda * cm);
+    if (cm > 0) {
+      const prev = busByKV.get(n.kv) ?? { rate: 0, cm: 0, customers: 0 };
+      busByKV.set(n.kv, { rate: prev.rate + lambda, cm: prev.cm + lambda * cm, customers: Math.max(prev.customers, cut.reduce((s2, l) => s2 + l.customers, 0)) });
+    }
   }
-  for (const [kv, cm] of busByKV) contributions.push({ cause: `Bus faults (${kv} kV)`, customerMinutes: cm, planned: false });
+  for (const [kv, b] of busByKV) contributions.push({ cause: `Bus faults (${kv} kV)`, customerMinutes: b.cm, planned: false, ratePerYear: b.rate, perEvent: b.rate > 0 ? b.cm / b.rate : 0, customers: b.customers, kind: 'bus' });
 
   const sum = (f: (c: OutageContribution) => boolean) => contributions.filter(f).reduce((s, c) => s + c.customerMinutes, 0);
   const unplanned = sum((c) => !c.planned && !c.external);
