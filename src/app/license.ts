@@ -26,8 +26,15 @@ interface Acceptance {
 }
 
 export function isLicenseAccepted(): boolean {
+  const hash = licenseHash();
   const a = load<Acceptance | null>('license', null);
-  return !!a && a.hash === licenseHash();
+  if (a && a.hash === hash) return true;
+  // Desktop builds also record acceptance in the user-data folder.
+  try {
+    return desktop?.licenseAcceptedHash?.() === hash;
+  } catch {
+    return false;
+  }
 }
 
 export function acceptLicense(): void {

@@ -1,0 +1,39 @@
+# Windows desktop packaging for Substation Designer.
+# The NSIS installer shows the license and requires "I Agree" before installing;
+# the game itself also requires license acceptance on first launch (all builds).
+appId: io.github.geographybuff.substationdesigner
+productName: Substation Designer
+copyright: Copyright (c) 2026 geographybuff and Substation Designer contributors
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+  - '!**/*.map'
+extraFiles:
+  - from: LICENSE
+    to: LICENSE.txt
+asar: true
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+  artifactName: SubstationDesigner-${version}-win-x64.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  license: build/license.txt
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Substation Designer
+  artifactName: SubstationDesigner-Setup-${version}.${ext}
+portable:
+  artifactName: SubstationDesigner-${version}-portable.${ext}
