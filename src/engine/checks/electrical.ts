@@ -35,8 +35,10 @@ export interface ElectricalFacts {
   isolable: Map<string, boolean>;
   /** For each breaker/recloser/regulator: can its circuit stay energized while it is out for maintenance? */
   bypassed: Map<string, boolean>;
-  /** Per load: the dedicated protective device (or null). */
+  /** Per load: the dedicated protective device (or null). For meshed schemes, the first device of its protection set. */
   feederProtection: Map<string, string | null>;
+  /** Per load or source line: the protective devices that isolate it (one for radial circuits, two in a ring). */
+  protectionSets: Map<string, string[]>;
   /** Per transformer: primary protective device ids (empty if none). */
   primaryProtection: Map<string, string[]>;
   /** Loads lacking voltage regulation in normal configuration. */
@@ -66,6 +68,55 @@ export function analyzeElectrical(design: Design, level: LevelDef, topo: Topolog
       }
     }
     feederProtection.set(l.itemId, found);
+  }
+
+  // Meshed schemes (ring, breaker-and-a-half...): no single device is a cut device, but the set of
+  // protective devices bounding the circuit's section isolates it without dropping other circuits.
+  const protectionSets = new Map<string, string[]>();
+  const sectionOf = (start: string): Set<string> => {
+    const sec = new Set([start]);
+    const q = [start];
+    while (q.length) {
+      const cur = q.shift()!;
+      for (const d of topo.devices) {
+        if (!d.closed || isProtective(d.kind) || d.kind === 'transformer' || d.kind === 'mobile_pad') continue;
+        const other = d.a === cur ? d.b : d.b === cur ? d.a : null;
+        if (other && !sec.has(other)) {
+          sec.add(other);
+          q.push(other);
+        }
+      }
+    }
+    return sec;
+  };
+  const boundingDevices = (sec: Set<string>) => topo.devices.filter((d) => isProtective(d.kind) && d.closed && ((d.a && sec.has(d.a)) || (d.b && sec.has(d.b))));
+  for (const l of servedLoads) {
+    const single = feederProtection.get(l.itemId);
+    if (single) {
+      protectionSets.set(l.itemId, [single]);
+      continue;
+    }
+    const sec = sectionOf(l.node!);
+    const cands = boundingDevices(sec);
+    if (!cands.length) continue;
+    const reached = topo.reach({ open: new Set(cands.map((c) => c.itemId)) });
+    if (reached.has(l.node!)) continue;
+    const othersOk = servedLoads.filter((o) => o !== l && !sec.has(o.node!)).every((o) => reached.has(o.node!));
+    if (othersOk) {
+      protectionSets.set(l.itemId, cands.map((c) => c.itemId));
+      feederProtection.set(l.itemId, cands[0]!.itemId);
+    }
+  }
+  if (topo.sources.length >= 2) {
+    for (const src of topo.sources) {
+      if (!src.node) continue;
+      const sec = sectionOf(src.node);
+      const cands = boundingDevices(sec);
+      if (!cands.length) continue;
+      const reached = topo.reach({ open: new Set(cands.map((c) => c.itemId)), sources: topo.sources.filter((x) => x !== src) });
+      if ([...sec].some((n) => reached.has(n))) continue;
+      protectionSets.set(src.itemId, cands.map((c) => c.itemId));
+    }
   }
 
   // Transformer primary protection: opening all protective devices on the HV side
@@ -125,7 +176,7 @@ export function analyzeElectrical(design: Design, level: LevelDef, topo: Topolog
     }
   }
 
-  return { isolable, bypassed, feederProtection, primaryProtection, unregulatedLoads };
+  return { isolable, bypassed, feederProtection, protectionSets, primaryProtection, unregulatedLoads };
 }
 
 function nearbyArrester(design: Design, topo: Topology, nodeId: string | null, at: { x: number; y: number }): PlacedItem | undefined {
@@ -199,7 +250,7 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
     }
   }
   // Each feeder named in the project should be served by exactly one getaway.
-  for (const f of level.system.feeders) {
+  for (const f of level.system.lvKV === undefined ? [] : level.system.feeders) {
     const exits = design.items.filter((i) => i.kind === 'feeder_exit' && i.props.feeder === f.name);
     if (exits.length === 0) {
       out.push({ id: fid('conn.feedermissing'), checkId: 'conn.feedermissing', severity: 'critical', category: 'objective', title: `${f.name} has no getaway`, detail: `Place a feeder getaway and assign it to ${f.name} (${f.customers.toLocaleString()} members).` });
@@ -226,6 +277,21 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
             : 'Each line position needs its own circuit breaker.',
         itemIds: [l.itemId],
         cite: [CITES.basicDist],
+      });
+    }
+  }
+  if (topo.sources.length >= 2) {
+    for (const src of topo.sources) {
+      if (!src.node || facts.protectionSets.has(src.itemId)) continue;
+      out.push({
+        id: fid('prot.source'),
+        checkId: 'prot.source',
+        severity: 'critical',
+        category: 'protection',
+        title: `${label(src.itemId)} cannot be cleared by station breakers`,
+        detail: 'With several lines feeding the station, a fault on one line must be cleared by breakers at the station so the other lines stay in service.',
+        itemIds: [src.itemId],
+        cite: [{ page: [614, 624], section: '12.4.2' }, { page: [136, 139], section: '4.6.4' }],
       });
     }
   }

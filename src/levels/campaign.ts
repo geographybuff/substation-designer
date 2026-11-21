@@ -382,6 +382,62 @@ export const L6_TOUCH_AND_STEP: LevelDef = {
   tutorial: undefined,
 };
 
+export const L7_RING_AROUND: LevelDef = {
+  id: 'l7-ring-around',
+  order: 7,
+  title: 'Ring Around',
+  subtitle: 'A 115 kV ring-bus switching station',
+  client: 'Bluestem Generation & Transmission Cooperative',
+  briefing: [
+    'Bluestem G&T is tying two 115 kV supply lines to two lines that feed its member cooperatives downstream. Build a switching station with a ring bus: four breaker positions in a closed loop, each line connected between two breakers.',
+    'A ring bus lets any breaker be taken out for maintenance without dropping a line, and a line fault is cleared by the two breakers on either side of it. Give every breaker disconnect switches on both sides and protective relays suited to transmission lines, power the relays from a station battery, and ground the yard for the heavy 115 kV fault current.',
+  ],
+  topics: [
+    { text: 'Ring bus (Fig. 4-14)', cite: { page: [136, 139], section: '4.6.4', figure: '4-14' } },
+    { text: 'Switching stations (Fig. 4-8)', cite: { page: [127, 128], section: '4.5', figure: '4-8' } },
+    { text: 'Transmission line protection', cite: { page: [614, 624], section: '12.4.2' } },
+    { text: 'Substation grounding', cite: { page: [548, 554], section: '9.10' } },
+  ],
+  site: { width: 56, depth: 50, altitudeM: 410, soilResistivity: 80, isokeraunicDays: 50, roadSide: 'W', notes: ['Upland pasture on a transmission corridor.', 'Access from the farm road on the west side.'] },
+  system: {
+    hvKV: 115,
+    hvFaultKA: 18,
+    hvGroundFaultKA: 14,
+    xOverR: 15,
+    splitFactor: 0.5,
+    faultDurationS: 0.3,
+    loadMVA: 60,
+    growthPct: 2,
+    horizonYears: 15,
+    powerFactor: 0.97,
+    hvEffectivelyGrounded: true,
+    feeders: [
+      { name: 'Bluestem East (Line 3)', share: 0.5, customers: 7000 },
+      { name: 'Prairie Wind (Line 4)', share: 0.5, customers: 6000 },
+    ],
+  },
+  fixtures: [
+    fixture('L1', 'line_terminal', 1, 8.5, 115, 'Line 1 from Cedar Bluff', { flow: 'in' }),
+    fixture('L2', 'line_terminal', 34.5, 1, 115, 'Line 2 from Osage Plant', { flow: 'in' }, 1),
+    fixture('L3', 'line_terminal', 50, 32.5, 115, 'Line 3 to Bluestem East', { flow: 'out' }, 2),
+    fixture('L4', 'line_terminal', 10.5, 46, 115, 'Line 4 to Prairie Wind', { flow: 'out' }, 3),
+  ],
+  tools: ['switch', 'breaker', 'arrester', 'mast', 'ccvt', 'wave_trap', 'vt', 'control_house'],
+  features: { fence: true, groundGrid: true, shieldWires: true, surfacing: true },
+  checksOff: ['layout.removal'],
+  budget: 2_100_000,
+  objectives: [
+    { id: 'o1', kind: 'switching_scheme', param: 'ring_bus', text: 'Build a ring bus', cite: { page: [136, 139], section: '4.6.4' } },
+    { id: 'o2', kind: 'line_protection', text: 'Every line can be cleared by station breakers with line relaying', cite: { page: [614, 624], section: '12.4.2' } },
+    { id: 'o3', kind: 'grounding_safe', text: 'Keep touch and step voltages below tolerable limits', cite: { page: [548, 554], section: '9.10' } },
+    { id: 'o4', kind: 'fence', text: 'Fence the yard with proper safety clearance', cite: { page: 158, figure: '4-21' } },
+    { id: 'o5', kind: 'arresters', text: 'Arresters at the incoming line entrances', optional: true, cite: { page: 356, section: '5.8.9' } },
+    { id: 'o6', kind: 'shielding', text: 'Shield all energized equipment', optional: true, cite: { page: 143, section: '4.7.3.4.1' } },
+  ],
+  simYears: 15,
+  reliabilityTarget: 8,
+};
+
 export const SANDBOX: LevelDef = {
   id: 'sandbox',
   order: 99,

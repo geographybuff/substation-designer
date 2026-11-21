@@ -24,9 +24,9 @@ export function breakerRoles(design: Design, topo: Topology, facts: ElectricalFa
   const roles = new Map<string, BreakerRole>();
   const items = new Map(design.items.map((i) => [i.id, i]));
   const dedicated = new Map<string, 'feeder' | 'line'>();
-  for (const l of topo.loads) {
-    const p = facts.feederProtection.get(l.itemId);
-    if (p) dedicated.set(p, items.get(l.itemId)?.kind === 'feeder_exit' ? 'feeder' : 'line');
+  for (const [endpoint, set] of facts.protectionSets) {
+    const role = items.get(endpoint)?.kind === 'feeder_exit' ? 'feeder' : 'line';
+    for (const p of set) if (!dedicated.has(p) || role === 'feeder') dedicated.set(p, role);
   }
   const primary = new Set<string>();
   for (const prot of facts.primaryProtection.values()) prot.forEach((p) => primary.add(p));

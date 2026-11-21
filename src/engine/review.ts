@@ -161,7 +161,7 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         note = `HV: ${scheme.hv}, LV: ${scheme.lv}`;
         break;
       case 'line_protection':
-        met = !has('prot.feeder') && !has('prot.line');
+        met = !has('prot.feeder') && !has('prot.source') && !has('relay.line');
         break;
       case 'arresters':
         met = !has('surge.');

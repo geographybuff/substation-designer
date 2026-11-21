@@ -254,11 +254,48 @@ export const SOLUTIONS: Record<string, () => Design> = {
       d.items.push(...L5_MASTS.map(([x, y, h], i) => it(`M${i + 1}`, 'mast', x, y, 0, { heightM: h })));
       d.fence = { rect: { x: 0.5, y: 5, w: 69.5, h: 42 }, gate: { side: 'N', offset: 16, width: 6 } };
     }),
+  'l7-ring-around': () =>
+    withLevel('l7-ring-around', (d) => {
+      const HV = 115;
+      const cb = { medium: 'sf6', continuousA: 1200, interruptingKA: 20, relays: ['21', '67', '79'] };
+      const swA = (id: string, x: number, y: number, rot: Rotation = 0, props: Props = {}) => it(id, 'switch', x, y, HV, props, rot);
+      d.items.push(
+        // North side (y = 12), east side (x = 38), south side (y = 36), west side (x = 14)
+        swA('NS1', 18.5, 9), it('NCB', 'breaker', 23.5, 9, HV, cb, 0, 'CB N'), swA('NS2', 29.5, 9),
+        swA('ES1', 35, 16.5, 1), it('ECB', 'breaker', 35, 21.5, HV, cb, 1, 'CB E'), swA('ES2', 35, 27.5, 1),
+        swA('SS1', 18.5, 33), it('SCB', 'breaker', 23.5, 33, HV, cb, 0, 'CB S'), swA('SS2', 29.5, 33),
+        swA('WS1', 11, 16.5, 1), it('WCB', 'breaker', 11, 21.5, HV, cb, 1, 'CB W'), swA('WS2', 11, 27.5, 1),
+        // Line disconnects with grounding switches
+        swA('LS1', 5, 9, 0, { groundingBlade: true }), swA('LS2', 35, 6, 1, { groundingBlade: true }),
+        swA('LS3', 43, 33, 0, { groundingBlade: true }), swA('LS4', 11, 39.5, 1, { groundingBlade: true }),
+        it('LA1', 'arrester', 2, 16.5, HV, { class: 'station' }, 1, 'Line 1 arresters'),
+        it('LA2', 'arrester', 43, 2, HV, { class: 'station' }, 0, 'Line 2 arresters'),
+        it('CH1', 'control_house', 21.5, 21, 0, { size: 'medium', battery: true }, 0, 'Control house'),
+      );
+      d.conductors.push(
+        bus('N1', HV, [14, 12], [18.5, 12]), bus('N2', HV, [22, 12], [23.5, 12]), bus('N3', HV, [28, 12], [29.5, 12]), bus('N4', HV, [33, 12], [38, 12]),
+        bus('E1', HV, [38, 12], [38, 16.5]), bus('E2', HV, [38, 20], [38, 21.5]), bus('E3', HV, [38, 26], [38, 27.5]), bus('E4', HV, [38, 31], [38, 36]),
+        bus('S1', HV, [14, 36], [18.5, 36]), bus('S2', HV, [22, 36], [23.5, 36]), bus('S3', HV, [28, 36], [29.5, 36]), bus('S4', HV, [33, 36], [38, 36]),
+        bus('W1', HV, [14, 12], [14, 16.5]), bus('W2', HV, [14, 20], [14, 21.5]), bus('W3', HV, [14, 26], [14, 27.5]), bus('W4', HV, [14, 31], [14, 36]),
+        bus('L1a', HV, [2.5, 12], [5, 12]), bus('L1b', HV, [8.5, 12], [14, 12]), bus('L1t', HV, [4.5, 12], [4.5, 16.5]),
+        bus('L2a', HV, [38, 2.5], [38, 6]), bus('L2b', HV, [38, 9.5], [38, 12]), bus('L2t', HV, [38, 4.5], [43, 4.5]),
+        bus('L3a', HV, [38, 36], [43, 36]), bus('L3b', HV, [46.5, 36], [50, 36]),
+        bus('L4a', HV, [14, 36], [14, 39.5]), bus('L4b', HV, [14, 43], [14, 46]),
+      );
+      d.items.push(...L7_MASTS.map(([x, y, h], i) => it(`M${i + 1}`, 'mast', x, y, 0, { heightM: h })));
+      d.fence = { rect: { x: 0.5, y: 0.5, w: 51.5, h: 47.5 }, gate: { side: 'W', offset: 26, width: 6 } };
+      d.groundGrid = { ...d.groundGrid, ...L7_GRID };
+      d.surfacing = { material: 'crushed_rock', thicknessM: 0.1 };
+    }),
 };
 
 /** Ground grid and surfacing for the L6 solution (cheapest safe option from a parameter sweep). */
 export const L6_GRID = { enabled: true, spacingM: 3, conductor: '4/0' as const, depthM: 0.5, rodCount: 20, rodLengthM: 3, extendBeyondFenceM: 1.25, fenceBonded: true };
 export const L6_SURFACING = { material: 'crushed_rock' as const, thicknessM: 0.1 };
+
+/** L7 solution masts and grid (searched). */
+export const L7_MASTS: Array<[number, number, number]> = [[9, 18, 22], [33, 7.5, 22], [19.5, 39, 22], [42, 30, 22], [42, 10.5, 22], [1.5, 7.5, 22], [18, 43.5, 22]];
+export const L7_GRID = { enabled: true, spacingM: 6, conductor: '4/0' as const, depthM: 0.5, rodCount: 30, rodLengthM: 3, extendBeyondFenceM: 1.25, fenceBonded: true };
 
 /** Mast positions for the L4 and L5 solutions (greedy coverage search). */
 export const L4_MASTS: Array<[number, number, number]> = [[39, 19.5, 20], [40.5, 30, 20], [12, 24, 20], [12, 13.5, 20], [39, 9, 20], [1.5, 27, 20], [39, 34.5, 20]];
