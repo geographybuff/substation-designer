@@ -10,3 +10,4 @@ Thumbs.db
 e2e/screenshots/
 e2e/out/
 *.tsbuildinfo
+.claude/
