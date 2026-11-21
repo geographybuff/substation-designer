@@ -40,11 +40,10 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
 
 ## Planned tags (create from the repo owner's machine)
 - v0.1.0 → commit 2da59f1 (first playable). v0.2.0 → 3214868 ("Finalize 0.2.0 changelog").
-- v0.3.0 → the "Release 0.3.0" commit (ring bus, altitude, standard recloser ratings, arrester MCOV).
+- v0.3.0 → 2002786 ("Release 0.3.0": ring bus, altitude, standard recloser ratings, arrester MCOV).
 
 ## TODO (in priority order)
-1. Self-audit facts vs bulletin (continue the log below: Tables 5-60/5-61, 5-57/5-58, 5-2, 5-25, 5-41, 5-59
-   not yet re-read against page text); playtest all eight projects in the browser and the Windows build.
+1. Self-audit facts vs bulletin (continue the log below; Table 5-60 not yet re-read against page text); playtest all eight projects in the browser and the Windows build.
 2. Optional mechanics: the §4.9 arrester alternative to raising BIL at altitude (keep standard BIL when
    arresters protect the derated BIL with margin); breaker rated-maximum-voltage altitude factor.
 3. More levels if wanted: breaker-and-a-half at 230 kV; capacitor bank level (Ch. 5.6).
@@ -59,3 +58,9 @@ Table 5-11 rows, Table 5-28 (+668 A footnote), §5.2.2 fan uprates 15%/25%, §12
 thresholds, §5.8.2 station class at 10,000 kVA, §9.10.2 3000 Ω·m surface minimum, §9.10.10 0.91 m
 perimeter rule, §2 8 ft fence (7 ft fabric + 1 ft barbed wire). Grounding equations cross-checked with
 IEEE 80 Annex B (tests/grounding.test.ts).
+0.3.0 additions re-read: Table 4-3 (BIL factors), §4.9 p. 156 altitude procedure and Table 4-9 (550/650/750 →
+473/559/645 kV), Table 4-10, Table 5-2 (0.4/0.0/0.5/0.5/0.0 %), Table 5-25, Tables 5-33/5-34 (0.4/0.5 % per
+100 m), Table 5-41, Table 5-59 (and the §5.9.1.3 text), Table 5-61 lines 9 (27 kV, 560 A, 10 kA) and 10 (38 kV,
+560 A, 12 kA; "suggested standard for future design"), Table 5-57 (all 46 MCOV rows), Table 5-58 station-class
+8/20 µs discharge ranges (the bulletin's 13.1 kV row lists L-G 4.56 kV, evidently a typo). Still to re-read:
+Table 5-60.
