@@ -106,7 +106,7 @@ export const L1_FIRST_LIGHT: LevelDef = {
     {
       id: 't6',
       title: 'Feeder bays',
-      body: 'Draw a 12.47 kV bus from the transformer LV terminal. For each feeder build a bay: disconnect switch → recloser → disconnect switch → feeder getaway. Assign each getaway to a feeder in the inspector.',
+      body: 'A feeder is a 12.47 kV distribution line leaving the station toward members. It is not a part you place: in the toolbox it ends at a "Feeder Getaway". This station serves two feeders, Elm Grove and Mill Road, so build two bays. First draw a 12.47 kV bus from the transformer LV terminal. Each bay is disconnect switch → recloser → disconnect switch → Feeder Getaway, joined with 12.47 kV bus. For the second bay, start a new bus by clicking on an existing 12.47 kV bus to branch it. Finally, select each getaway and set its Feeder field in the inspector.',
       until: 'feeders_protected',
       highlightTool: 'recloser',
     },

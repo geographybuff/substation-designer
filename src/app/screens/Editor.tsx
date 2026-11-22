@@ -3,7 +3,7 @@ import { itemRect } from '../../engine/items';
 import { simulate } from '../../engine/simulation';
 import type { Finding } from '../../engine/types';
 import { EditorController } from '../../editor/controller';
-import { stepDone } from '../../levels/tutorial';
+import { stepDone, stepPending } from '../../levels/tutorial';
 import { Briefing } from '../components/Briefing';
 import { Inspector, money } from '../components/Inspector';
 import { ReviewPanel } from '../components/ReviewPanel';
@@ -71,6 +71,7 @@ export function Editor() {
   const tut = level?.tutorial;
   const step = tut && tutorialStep < tut.length ? tut[tutorialStep] : null;
   const stepComplete = step && level && design ? (step.until ? stepDone(step.until, design, level, review) : false) : false;
+  const pending = step?.until && !stepComplete ? stepPending(step.until, review) : [];
   useEffect(() => {
     if (step?.until && stepComplete) {
       const t = setTimeout(() => store.set({ tutorialStep: store.get().tutorialStep + 1 }), 600);
@@ -201,6 +202,16 @@ export function Editor() {
             </div>
             <h4>{step.title}</h4>
             <p>{step.body}</p>
+            {pending.length > 0 && (
+              <div class="tutorial-pending" data-testid="tutorial-pending">
+                <div class="small muted">Still needed:</div>
+                <ul>
+                  {pending.slice(0, 4).map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '.5em', alignItems: 'center' }}>
               {step.until ? (
                 <span class="small" style={{ color: stepComplete ? 'var(--ok)' : 'var(--dim)' }}>

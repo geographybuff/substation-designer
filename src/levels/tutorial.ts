@@ -21,6 +21,24 @@ export const TUTORIAL_CONDITIONS: Record<string, Cond> = {
   fence_ok: (_d, _l, r) => objectiveMet(r, 'fence'),
 };
 
+/**
+ * Review findings that still block a step, so the tutorial can say what is missing
+ * instead of only "Waiting for you". Prefixes mirror the objectives each condition checks.
+ */
+const PENDING_CHECKS: Record<string, { prefixes: string[]; critical?: boolean }> = {
+  feeders_protected: { prefixes: ['conn.feedermissing', 'conn.dead', 'conn.feederunassigned', 'prot.feeder'] },
+  fence_ok: { prefixes: ['fence'], critical: true },
+};
+
+export function stepPending(id: string | undefined, review: DesignReview | null): string[] {
+  const spec = id ? PENDING_CHECKS[id] : undefined;
+  if (!spec || !review) return [];
+  const titles = review.findings
+    .filter((f) => spec.prefixes.some((p) => f.checkId.startsWith(p)) && (!spec.critical || f.severity === 'critical'))
+    .map((f) => f.title);
+  return [...new Set(titles)];
+}
+
 export function stepDone(id: string | undefined, design: Design, level: LevelDef, review: DesignReview | null): boolean {
   if (!id) return false;
   const c = TUTORIAL_CONDITIONS[id];

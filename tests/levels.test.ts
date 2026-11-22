@@ -4,6 +4,7 @@ import { SOLUTIONS } from '../src/levels/solutions';
 import { reviewDesign } from '../src/engine/review';
 import { newDesign } from '../src/engine/design';
 import { simulate } from '../src/engine/simulation';
+import { stepDone, stepPending } from '../src/levels/tutorial';
 
 describe('campaign levels', () => {
   it('have unique ids and orders', () => {
@@ -43,4 +44,24 @@ describe('campaign levels', () => {
       });
     });
   }
+});
+
+describe('First Light tutorial', () => {
+  const level = CAMPAIGN.find((l) => l.id === 'l1-first-light')!;
+
+  it('completes the feeder-bay step with both bays built', () => {
+    const d = SOLUTIONS[level.id]!();
+    const r = reviewDesign(d, level);
+    expect(stepDone('feeders_protected', d, level, r)).toBe(true);
+    expect(stepPending('feeders_protected', r)).toEqual([]);
+  });
+
+  it('names the missing feeder when only one bay is built', () => {
+    const d = SOLUTIONS[level.id]!();
+    d.items = d.items.filter((i) => !['SA2', 'R2', 'SB2', 'FE2'].includes(i.id));
+    d.conductors = d.conductors.filter((c) => !c.id.startsWith('F2'));
+    const r = reviewDesign(d, level);
+    expect(stepDone('feeders_protected', d, level, r)).toBe(false);
+    expect(stepPending('feeders_protected', r).join(' ')).toContain('Mill Road');
+  });
 });
