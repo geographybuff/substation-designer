@@ -603,9 +603,11 @@ export const FINDING_HELP: Record<string, FindingHelpFn> = {
     const blame = culprits.length ? culprits : no;
     const loose = itemsOf(design, uniq(review.topo.unconnectedPorts.map((p) => p.itemId))).filter((x) => x.kind !== 'mobile_pad');
     return {
-      what: `${name} has a bus on its terminal, but no closed path leads from it back to an incoming line, so its members get no power.`,
+      what: node
+        ? `${name} has a bus on its terminal, but no closed path leads from it back to an incoming line, so its members get no power.`
+        : `${name} has no bus on its terminal yet, so nothing feeds it and its members get no power.`,
       steps: steps(
-        `Follow the buses back from ${name} towards the incoming line.`,
+        node ? `Follow the buses back from ${name} towards the incoming line.` : `Pick the Bus tool and draw from the terminal dot of ${name} to the bay or bus that should feed it.`,
         viaNO && `The path is broken by a normally-open device (${names(blame)}). Untick Normally open on the one in the main path; keep it ticked only on bypass and tie switches.`,
         !viaNO && loose.length > 0 && `Terminals with no bus on the way: ${names(loose)}. Draw the missing buses with the Bus tool.`,
         !viaNO && !loose.length && 'Look for a gap: a bus that stops short of a terminal dot or of another bus.',

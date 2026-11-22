@@ -42,6 +42,18 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
   supports keep clear of junctions.
 - 3D view: jumpers from a bus to a terminal pair each phase with the nearest bushing instead of
   crossing at random.
+- Objectives no longer show as met before there is anything to judge: on an empty design, or with
+  feeders, lines or the transformer not yet connected, they stay open with a note such as "connect
+  every feeder first". Shielding, arresters, clearances, the expansion area and removal routes need
+  the equipment (and fence) they are about.
+- A feeder getaway with no bus on its terminal is now flagged as not connected; before, placing
+  getaways anywhere satisfied "Serve the feeders".
+- Line protection no longer fails because of the minor distance-relay advice at 69 kV and above.
+- Only an energized station service transformer satisfies the AC auxiliary check, and only connected
+  capacitor banks count toward a kvar objective.
+- Ground grid findings are no longer reported twice (burial depth, thin surface layer). A missing
+  surface layer is one minor finding where the project offers surfacing (section 9.10.2 step 7)
+  instead of an info note plus a separate minor advice.
 
 ## [0.3.0] - 2026-11-21
 

@@ -153,3 +153,83 @@ describe('alignment guide', () => {
     expect(alignPlacement(without, { ...r1, y: r1.y + 2 })).toEqual({ x: r1.x, y: r1.y + 2 });
   });
 });
+
+describe('objectives are only met by a real, connected design', () => {
+  it('an empty design meets no objective on any campaign level', async () => {
+    const { CAMPAIGN } = await import('../src/levels');
+    const { newDesign } = await import('../src/engine/design');
+    for (const level of CAMPAIGN) {
+      const met = reviewDesign(newDesign(level), level).objectives.filter((o) => o.met).map((o) => o.objective.kind);
+      expect(met, level.id).toEqual([]);
+    }
+  });
+
+  it('unconnected getaways are flagged and do not serve or protect feeders', () => {
+    const level = getLevel('l1-first-light')!;
+    const d = SOLUTIONS[level.id]!();
+    d.conductors = [];
+    const r = reviewDesign(d, level);
+    const dead = r.findings.filter((f) => f.checkId === 'conn.dead');
+    expect(dead.map((f) => f.title)).toEqual(expect.arrayContaining([expect.stringMatching(/not connected$/)]));
+    const met = r.objectives.filter((o) => o.met).map((o) => o.objective.kind);
+    for (const k of ['feeders_served', 'feeder_protection', 'transformer_protection']) expect(met).not.toContain(k);
+    expect(r.objectives.find((o) => o.objective.kind === 'feeder_protection')!.note).toBe('connect every feeder first');
+  });
+
+  it('line protection fails without line relays but not for the distance-relay advice', () => {
+    const level = getLevel('l7-ring-around')!;
+    const status = (d: Design) => {
+      const r = reviewDesign(d, level);
+      return { met: r.objectives.find((o) => o.objective.kind === 'line_protection')!.met, ids: r.findings.map((f) => f.checkId) };
+    };
+    const d = SOLUTIONS[level.id]!();
+    expect(status(d).met).toBe(true);
+    const advice = clone(d);
+    advice.items = advice.items.map((i) => (i.id === 'NCB' ? { ...i, props: { ...i.props, relays: ['67'] } } : i));
+    const a = status(advice);
+    expect(a.ids).toContain('relay.line.distance');
+    expect(a.met).toBe(true);
+    const none = clone(d);
+    none.items = none.items.map((i) => (i.id === 'NCB' ? { ...i, props: { ...i.props, relays: [] } } : i));
+    const n = status(none);
+    expect(n.ids).toContain('relay.line');
+    expect(n.met).toBe(false);
+  });
+
+  it('a station service transformer must be energized to count', () => {
+    const level = getLevel('l5-growing-pains')!;
+    const d = SOLUTIONS[level.id]!();
+    expect(reviewDesign(d, level).findings.map((f) => f.checkId)).not.toContain('aux.ac');
+    d.conductors = d.conductors.filter((c) => c.id !== 'SSL');
+    const f = reviewDesign(d, level).findings.find((x) => x.checkId === 'aux.ac');
+    expect(f?.title).toBe('Station service transformer is not energized');
+  });
+
+  it('only connected capacitor banks count toward a kvar objective', () => {
+    const base = getLevel('l2-keep-the-lights-on')!;
+    const level = { ...base, objectives: [...base.objectives, { id: 'cx', kind: 'capacitor_kvar' as const, text: 'Install 600 kvar', param: 600 }] };
+    const d = SOLUTIONS[base.id]!();
+    d.items.push({ id: 'CAP1', kind: 'capacitor_bank', x: 50, y: 40, rot: 0, kv: 12.47, props: { kvar: 1200 } });
+    const o = reviewDesign(d, level).objectives.find((x) => x.objective.kind === 'capacitor_kvar')!;
+    expect(o.met).toBe(false);
+    expect(o.note).toBe('0 kvar connected');
+  });
+});
+
+describe('grounding findings are reported once', () => {
+  const level = getLevel('l6-touch-and-step')!;
+  const ground = (d: Design) => reviewDesign(d, level).findings.filter((f) => f.checkId.startsWith('ground.')).map((f) => `${f.checkId}:${f.severity}`);
+  it('burial depth and a missing surface layer each give one finding', () => {
+    const d = SOLUTIONS[level.id]!();
+    d.groundGrid = { ...d.groundGrid, depthM: 2 };
+    d.surfacing = { material: 'none', thicknessM: 0.1 };
+    const g = ground(d);
+    expect(g.filter((x) => x.startsWith('ground.depth'))).toEqual(['ground.depth:minor']);
+    expect(g.filter((x) => x.includes('surface'))).toEqual(['ground.surface:minor']);
+  });
+  it('a thin surface layer gives one finding', () => {
+    const d = SOLUTIONS[level.id]!();
+    d.surfacing = { ...d.surfacing, thicknessM: 0.05 };
+    expect(ground(d).filter((x) => x.includes('surface'))).toEqual(['ground.surfacethin:minor']);
+  });
+});

@@ -245,8 +245,16 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
     if (it.kind === 'feeder_exit' && !l.feeder) {
       out.push({ id: fid('conn.feederunassigned'), checkId: 'conn.feederunassigned', severity: 'major', category: 'connectivity', title: `${label(l.itemId)} serves no feeder`, detail: 'Select which feeder this getaway serves in the inspector.', itemIds: [l.itemId] });
     }
-    if (l.node && !topo.energized.has(l.node)) {
-      out.push({ id: fid('conn.dead'), checkId: 'conn.dead', severity: 'critical', category: 'connectivity', title: `${label(l.itemId)} is not energized`, detail: 'No closed path connects it to an incoming line. Check open switches and missing bus.', itemIds: [l.itemId] });
+    if (!l.node || !topo.energized.has(l.node)) {
+      out.push({
+        id: fid('conn.dead'),
+        checkId: 'conn.dead',
+        severity: 'critical',
+        category: 'connectivity',
+        title: l.node ? `${label(l.itemId)} is not energized` : `${label(l.itemId)} is not connected`,
+        detail: l.node ? 'No closed path connects it to an incoming line. Check open switches and missing bus.' : 'No bus reaches its terminal. Draw a bus from its terminal to the rest of the station.',
+        itemIds: [l.itemId],
+      });
     }
   }
   // Each feeder named in the project should be served by exactly one getaway.
@@ -326,14 +334,15 @@ export function checkElectrical(design: Design, level: LevelDef, topo: Topology,
       cite: [{ page: [680, 681], section: '15.2' }, { page: 244, section: '5.3.6' }],
     });
   }
-  if (controlHouses.length && !design.items.some((i) => i.kind === 'station_service') && level.system.lvKV !== undefined && level.tools.includes('station_service')) {
+  const stationServiceLive = topo.shunts.some((sh) => items.get(sh.itemId)?.kind === 'station_service' && !!sh.node && topo.energized.has(sh.node));
+  if (controlHouses.length && !stationServiceLive && level.system.lvKV !== undefined && level.tools.includes('station_service')) {
     out.push({
       id: fid('aux.ac'),
       checkId: 'aux.ac',
       severity: 'minor',
       category: 'protection',
-      title: 'No station service transformer',
-      detail: 'The AC auxiliary system (battery charger, heaters, lighting) needs a reliable source such as a station service transformer.',
+      title: design.items.some((i) => i.kind === 'station_service') ? 'Station service transformer is not energized' : 'No station service transformer',
+      detail: 'The AC auxiliary system (battery charger, heaters, lighting) needs a reliable source such as a station service transformer connected to an energized bus.',
       cite: [{ page: 673, section: '15.1' }],
     });
   }

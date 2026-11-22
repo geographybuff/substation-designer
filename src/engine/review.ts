@@ -2,6 +2,7 @@
  * Design review: runs every check, evaluates objectives, costs, reliability
  * and produces the pass/star result shown to the player.
  */
+import { CATALOG } from './catalog';
 import { computeStation, type StationCalc } from './calc';
 import { analyzeElectrical, checkElectrical, type ElectricalFacts } from './checks/electrical';
 import { checkPhysical } from './checks/physical';
@@ -94,21 +95,34 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
   for (const f of findings) counts[f.severity]++;
 
   const has = (prefix: string, sev?: Severity[]) => findings.some((f) => f.checkId.startsWith(prefix) && (!sev || sev.includes(f.severity)));
+  const hasExact = (checkId: string) => findings.some((f) => f.checkId === checkId);
+  // "No finding X" objectives only count once the equipment they are about exists and is energized,
+  // so an empty or unconnected design never shows them as met.
+  const live = (node: string | null | undefined) => !!node && topo.energized.has(node);
+  const lvStation = level.system.lvKV !== undefined;
+  const loadsLive = topo.loads.length > 0 && topo.loads.every((l) => live(l.node));
+  const loadsNote = loadsLive ? undefined : topo.loads.length === 0 ? (lvStation ? 'no feeder getaways yet' : 'no outgoing lines yet') : lvStation ? 'connect every feeder first' : 'connect every line first';
+  const linesLive = topo.sources.length > 0 && topo.sources.every((s) => live(s.node)) && topo.loads.every((l) => live(l.node));
+  const transformers = design.items.filter((i) => i.kind === 'transformer');
+  const transformersLive = transformers.length > 0 && transformers.every((t) => live(topo.nodeOfPort.get(`${t.id}:hv`)));
   const objectives: ObjectiveStatus[] = level.objectives.map((o) => {
     let met = false;
     let note: string | undefined;
     switch (o.kind) {
       case 'feeders_served':
-        met = !has('conn.feedermissing') && !has('conn.dead') && !has('conn.feederunassigned');
+        met = loadsLive && !has('conn.feedermissing') && !has('conn.dead') && !has('conn.feederunassigned');
         break;
       case 'feeder_protection':
-        met = !has('prot.feeder');
+        met = loadsLive && !has('prot.feeder');
+        note = loadsNote;
         break;
       case 'transformer_protection':
-        met = !has('prot.primary') && design.items.some((i) => i.kind === 'transformer');
+        met = transformersLive && !has('prot.primary');
+        if (!transformersLive) note = transformers.length ? 'connect the transformer first' : 'no transformer yet';
         break;
       case 'voltage_regulation':
-        met = !has('volt.regulation') && topo.loads.length > 0;
+        met = loadsLive && !has('volt.regulation');
+        note = loadsNote;
         break;
       case 'bypass_reclosers': {
         const devs = design.items.filter((i) => i.kind === 'recloser' || (i.kind === 'breaker' && topo.loads.some((l) => l.feeder && facts.feederProtection.get(l.itemId) === i.id)));
@@ -121,7 +135,7 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         break;
       }
       case 'shielding':
-        met = shielding.coveredFraction >= 0.999;
+        met = design.items.some((i) => !i.locked && CATALOG[i.kind].live) && shielding.coveredFraction >= 0.999;
         note = `${Math.round(shielding.coveredFraction * 100)}% covered`;
         break;
       case 'grounding_safe':
@@ -135,7 +149,8 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         break;
       case 'mobile_provision': {
         const pads = design.items.filter((i) => i.kind === 'mobile_pad');
-        met = pads.some((p) => {
+        if (!loadsLive) note = loadsNote;
+        met = loadsLive && pads.some((p) => {
           const d = topo.deviceById.get(p.id);
           if (!d?.a || !d.b) return false;
           const xf = topo.devices.filter((t) => t.kind === 'transformer');
@@ -145,11 +160,15 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         break;
       }
       case 'expansion_area':
-        met = !has('site.expansion');
+        // The area must be inside the fence, which can only be judged once there is one.
+        met = !!design.fence && !has('site.expansion');
+        if (!design.fence) note = 'no fence yet';
         break;
       case 'n_minus_1_transformer': {
         const xf = design.items.filter((i) => i.kind === 'transformer');
+        if (!loadsLive) note = loadsNote;
         met =
+          loadsLive &&
           xf.length >= 2 &&
           xf.every((t) => {
             const reach = topo.reach({ open: new Set([t.id]), closeNormallyOpen: true });
@@ -164,22 +183,29 @@ export function reviewDesign(design: Design, level: LevelDef, opts: { shieldingM
         note = `HV: ${scheme.hv}, LV: ${scheme.lv}`;
         break;
       case 'line_protection':
-        met = !has('prot.feeder') && !has('prot.source') && !has('relay.line');
+        // relay.line exactly: its minor advice relay.line.distance does not fail the objective.
+        met = linesLive && !has('prot.feeder') && !has('prot.source') && !hasExact('relay.line');
+        if (!linesLive) note = 'connect every line first';
         break;
-      case 'arresters':
-        met = !has('surge.');
+      case 'arresters': {
+        const stationLive = topo.sources.some((src) => live(src.node)) && (!lvStation || transformersLive);
+        met = stationLive && design.items.some((i) => i.kind === 'arrester') && !has('surge.');
         break;
+      }
       case 'clearances':
-        met = !has('clear.') && !has('fence.clearance');
+        // Fence clearance is part of it, so it needs a fence and some bus to judge.
+        met = design.conductors.length > 0 && !!design.fence && !has('clear.') && !has('fence.clearance');
         break;
       case 'capacitor_kvar': {
-        const kvar = design.items.filter((i) => i.kind === 'capacitor_bank').reduce((s, c) => s + Number(c.props.kvar), 0);
+        const kvar = design.items.filter((i) => i.kind === 'capacitor_bank' && live(topo.nodeOfPort.get(`${i.id}:a`))).reduce((s, c) => s + Number(c.props.kvar), 0);
         met = kvar >= Number(o.param ?? 0);
-        note = `${kvar} kvar installed`;
+        note = `${kvar} kvar connected`;
         break;
       }
       case 'removal_path':
-        met = !has('layout.removal');
+        // Routes are traced to the fence gate for the transformers (and breakers).
+        met = !!design.fence && transformers.length > 0 && !has('layout.removal');
+        if (!design.fence) note = 'no fence yet';
         break;
     }
     return { objective: o, met, note };
