@@ -4,6 +4,9 @@ import { reviewDesign } from '../src/engine/review';
 import { fenceRequiredDistance, fenceZoneViolation } from '../src/engine/checks/physical';
 import { fixedAngleProtected, strikeDistanceM, allowableStrokeCurrentKA } from '../src/engine/lightning';
 import type { Design } from '../src/engine/types';
+import { SOLUTIONS } from '../src/levels/solutions';
+import { getLevel } from '../src/levels';
+import { alignItemToBus, moveItem } from '../src/engine/design';
 
 const clone = (d: Design): Design => structuredClone(d);
 
@@ -66,6 +69,45 @@ describe('design review catches classic mistakes', () => {
   });
 });
 
+describe('phases of one bus (Table 4-7)', () => {
+  const level = getLevel('l2-keep-the-lights-on')!;
+  const ids = (d: Design) => reviewDesign(d, level).findings.map((f) => f.checkId);
+
+  it('flags a bus entering a terminal from the side after an off-line drag, and lines it back up', () => {
+    const ok = SOLUTIONS[level.id]!();
+    const r1 = ok.items.find((i) => i.id === 'R1')!;
+    // Half a metre off the bay centre line: the moved bus ends dog-leg into both terminals.
+    const off = moveItem(ok, 'R1', r1.x, r1.y + 0.5);
+    const f = reviewDesign(off, level).findings.filter((x) => x.checkId === 'conn.sideentry');
+    expect(f.length).toBeGreaterThan(0);
+    expect(f[0]!.itemIds).toEqual(['R1']);
+    const fixed = alignItemToBus(off, level, 'R1', f[0]!.conductorIds![0]!)!;
+    expect(fixed).not.toBeNull();
+    expect(fixed.items.find((i) => i.id === 'R1')!.y).toBeCloseTo(r1.y);
+    expect(ids(fixed)).not.toContain('conn.sideentry');
+    expect(ids(fixed)).not.toContain('clear.selfphase');
+  });
+
+  it('flags a jog shorter than two phase spacings', () => {
+    const d = SOLUTIONS[level.id]!();
+    // Replace a straight feeder connection with a 0.5 m Z-jog (12.47 kV phase spacing is 0.61 m).
+    const c = d.conductors.find((x) => x.id === 'F1d')!;
+    const [a, b] = [c.points[0]!, c.points[c.points.length - 1]!];
+    const mx = (a.x + b.x) / 2;
+    c.points = [a, { x: mx - 0.5, y: a.y }, { x: mx - 0.5, y: a.y + 0.5 }, { x: mx, y: a.y + 0.5 }, { x: mx, y: a.y }, b];
+    expect(ids(d)).toContain('clear.selfphase');
+  });
+
+  it('accepts square corners and branches that tap a straight terminal entry', () => {
+    for (const lv of ['l1-first-light', 'l2-keep-the-lights-on', 'l5-growing-pains']) {
+      const l = getLevel(lv)!;
+      const found = reviewDesign(SOLUTIONS[lv]!(), l).findings.map((f) => f.checkId);
+      expect(found).not.toContain('conn.sideentry');
+      expect(found).not.toContain('clear.selfphase');
+    }
+  });
+});
+
 describe('Figure 4-21 fence safety zone', () => {
   it('requires the full B distance for low live parts', () => {
     expect(fenceRequiredDistance(1.0, 69)).toBeCloseTo(3.7);
@@ -95,5 +137,19 @@ describe('§4.7.3 shielding methods', () => {
     const Is = allowableStrokeCurrentKA(350, 350);
     expect(Is).toBeCloseTo(2.2);
     expect(strikeDistanceM(Is, 1)).toBeCloseTo(8 * Math.pow(2.2, 0.65), 6);
+  });
+});
+
+describe('alignment guide', () => {
+  it('slides equipment placed half a metre off the bay line back onto it', async () => {
+    const { alignPlacement } = await import('../src/engine/design');
+    const level = getLevel('l2-keep-the-lights-on')!;
+    const d = SOLUTIONS[level.id]!();
+    const r1 = d.items.find((i) => i.id === 'R1')!;
+    const without = { ...d, items: d.items.filter((i) => i.id !== 'R1') };
+    expect(alignPlacement(without, { ...r1, y: r1.y + 0.5 })).toEqual({ x: r1.x, y: r1.y });
+    expect(alignPlacement(without, { ...r1, y: r1.y - 0.5 })).toEqual({ x: r1.x, y: r1.y });
+    // Far off the line: left alone.
+    expect(alignPlacement(without, { ...r1, y: r1.y + 2 })).toEqual({ x: r1.x, y: r1.y + 2 });
   });
 });

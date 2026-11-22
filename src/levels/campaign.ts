@@ -176,6 +176,12 @@ export const L2_KEEP_LIGHTS_ON: LevelDef = {
   ],
   simYears: 10,
   reliabilityTarget: 230,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'Cottonwood Valley\'s long feeders sag in voltage on hot afternoons, and its crews must maintain reclosers without dropping members. Build the station as in First Light, now with three feeder bays, then add voltage regulation and recloser bypasses. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Regulate the voltage', body: 'Place Voltage Regulators either once on the 12.47 kV bus right after the transformer (bus regulation) or in every feeder bay (feeder regulation, Fig. 4-3). A transformer with "Load tap changer (LTC)" ticked in the Inspector also regulates the bus.', until: 'objective:voltage_regulation', highlightTool: 'regulator', objective: 'voltage_regulation' },
+    { id: 't3', title: 'Bypass each recloser', body: 'For every feeder bay, add Hook Stick Switches with "Normally open" ticked, connected from the station bus to the feeder side of the bay (Fig. 4-4). Closing it lets a crew open the recloser and its two disconnect switches while the feeder stays energized.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers' },
+    { id: 't4', title: 'Finish up', body: 'Optional: regulators can be bypassed too. Keep "Bypass switches" ticked in each regulator\'s Inspector. Then fence the yard, clear the critical findings and press Energize.' },
+  ],
 };
 
 export const L3_THUNDERSTORM_ALLEY: LevelDef = {
@@ -230,6 +236,12 @@ export const L3_THUNDERSTORM_ALLEY: LevelDef = {
   ],
   simYears: 10,
   reliabilityTarget: 230,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'This site sees about 70 thunderstorm days a year. The station needs direct-stroke shielding over everything energized and surge arresters at the transformer and line entrance. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Shield the yard', body: 'Place Lightning Masts around the equipment and turn on the Shielding overlay: every energized part must sit inside the protected zone (fixed-angle method, 30° and 45°, Fig. 4-17). Raise a mast in the Inspector to widen its zone; shield wires between masts cover long spans.', until: 'objective:shielding', highlightTool: 'mast', objective: 'shielding' },
+    { id: 't3', title: 'Surge arresters', body: 'Place Surge Arrester Stands at the transformer high-voltage and low-voltage terminals and at the incoming line, and connect each to the bus right at that terminal (section 4.3.5). Arresters protect only what is close to them.', until: 'objective:arresters', highlightTool: 'arrester', objective: 'arresters' },
+    { id: 't4', title: 'Finish up', body: 'Regulate feeder voltage and fence the yard as in the earlier projects. Recloser bypasses are optional here but earn the third star.' },
+  ],
 };
 
 export const L4_MOBILE_READY: LevelDef = {
@@ -285,6 +297,12 @@ export const L4_MOBILE_READY: LevelDef = {
   ],
   simYears: 10,
   reliabilityTarget: 60,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'This cooperative keeps a mobile transformer for emergencies, so the station needs a pad where it can be connected to carry every feeder, and a clear route to drive the station transformer out. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Mobile transformer pad', body: 'Place a Mobile Unit Connection Pad. Connect its high-voltage side to the 69 kV bus and its low-voltage side to the 12.47 kV bus, each through a Disconnect Switch with "Normally open" ticked, so a mobile unit parked there can feed every feeder while the station transformer is out.', until: 'objective:mobile_provision', highlightTool: 'mobile_pad', objective: 'mobile_provision' },
+    { id: 't3', title: 'Removal route', body: 'Turn on the Removal overlay. The transformer needs a path to the gate wide enough for it. Low buses block that path: leave a gap, or draw the bus across the route with the High bus tool.', until: 'objective:removal_path', objective: 'removal_path' },
+    { id: 't4', title: 'Bypass the reclosers', body: 'As in Keep the Lights On, give every recloser a normally-open bypass switch.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers' },
+  ],
 };
 
 export const L5_GROWING_PAINS: LevelDef = {
@@ -345,6 +363,12 @@ export const L5_GROWING_PAINS: LevelDef = {
   ],
   simYears: 15,
   reliabilityTarget: 40,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'Growing load needs two transformers, a 12.47 kV bus split into two sections with a tie breaker, and room for a future bay. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Either transformer carries the load', body: 'Size both transformers so either one alone can carry today\'s peak with the other out of service (N-1). The Review panel shows today\'s peak; check each transformer\'s top rating in the Inspector.', until: 'objective:n_minus_1_transformer', highlightTool: 'transformer', objective: 'n_minus_1_transformer' },
+    { id: 't3', title: 'Sectionalized bus', body: 'Build two 12.47 kV bus sections, one per transformer, and join them with a Power Circuit Breaker set "Normally open (tie)" in the Inspector (section 4.6.2). Split the feeders between the sections.', until: 'objective:switching_scheme', highlightTool: 'breaker', objective: 'switching_scheme' },
+    { id: 't4', title: 'Leave room to grow', body: 'Keep the marked future bay area inside the fence and free of equipment and bus.', until: 'objective:expansion_area', objective: 'expansion_area' },
+  ],
 };
 
 export const L6_TOUCH_AND_STEP: LevelDef = {
@@ -379,7 +403,11 @@ export const L6_TOUCH_AND_STEP: LevelDef = {
     { id: 'o6', kind: 'shielding', text: 'Shield all energized equipment', optional: true, cite: { page: 143, section: '4.7.3.4.1' } },
     { id: 'o7', kind: 'fence', text: 'Fence the yard with proper safety clearance', cite: { page: 158, figure: '4-21' } },
   ],
-  tutorial: undefined,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'A ground fault drives current into the earth and raises the voltage of everything in the yard. The ground grid must keep touch and step voltages below what a person can tolerate (Chapter 9). Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Design the ground grid', body: 'Click empty ground so nothing is selected: the Inspector shows the Site settings. Tick "Install grid", then adjust spacing, rods and surfacing until the Review panel shows the grid as safe. Turn on the Grounding overlay to see it.', until: 'objective:grounding_safe', objective: 'grounding_safe' },
+    { id: 't3', title: 'Finish up', body: 'Protect the transformer and feeders, regulate voltage and fence the yard as before. Bond the fence to the grid and run the grid past the fence line.' },
+  ],
 };
 
 export const L7_RING_AROUND: LevelDef = {
@@ -436,6 +464,12 @@ export const L7_RING_AROUND: LevelDef = {
   ],
   simYears: 15,
   reliabilityTarget: 8,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'A 115 kV switching station with four lines and no transformer. A ring bus lets any one breaker be taken out without losing a line (section 4.6.4). Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Build the ring', body: 'Connect Power Circuit Breakers in a closed loop with a disconnect switch on each side of every breaker, and connect each line terminal to the ring between two breakers.', until: 'objective:switching_scheme', highlightTool: 'breaker', objective: 'switching_scheme' },
+    { id: 't3', title: 'Line relaying', body: 'Every line must be cleared by the breakers on both sides of its ring position. Select each breaker and add line relays in the Inspector (section 12.4.2).', until: 'objective:line_protection', objective: 'line_protection' },
+    { id: 't4', title: 'Ground grid', body: 'Click empty ground and design the ground grid in the Site settings until touch and step voltages are safe.', until: 'objective:grounding_safe', objective: 'grounding_safe' },
+  ],
 };
 
 export const L8_THIN_AIR: LevelDef = {
@@ -493,6 +527,12 @@ export const L8_THIN_AIR: LevelDef = {
   ],
   simYears: 10,
   reliabilityTarget: 340,
+  tutorial: [
+    { id: 't1', title: 'What is new here', body: 'At 2400 m the thin air insulates and cools less. Clearances grow (section 4.9, Table 4-9) and transformer ratings derate (Table 5-2). The info finding in the Review tab lists the corrections for this site. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
+    { id: 't2', title: 'Altitude clearances', body: 'Footprints and bus heights already use the altitude-corrected clearances. Keep the larger gaps between equipment and buses, and between live parts and the fence.', until: 'objective:clearances', objective: 'clearances' },
+    { id: 't3', title: 'Derated transformer', body: 'Pick a transformer rating whose derated top rating still covers the 10-year forecast. The Review panel\'s Transformer capacity line shows the derated value.', until: 'objective:transformer_capacity', highlightTool: 'transformer', objective: 'transformer_capacity' },
+    { id: 't4', title: 'Finish up', body: 'Add arresters, regulate voltage, design the ground grid and fence the yard, as in the earlier projects.' },
+  ],
 };
 
 export const SANDBOX: LevelDef = {

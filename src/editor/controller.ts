@@ -6,6 +6,7 @@ import { CATALOG } from '../engine/catalog';
 import {
   addConductor,
   addItem,
+  alignPlacement,
   addShieldWire,
   deleteConductors,
   deleteItems,
@@ -116,8 +117,7 @@ export class EditorController {
       const kind = s.tool.item;
       const props = { ...(kind === 'transformer' || kind === 'mobile_pad' ? transformerProps(level) : {}), ...defaultPropsFor(kind) };
       const r0 = previewRect(kind, s.tool.kv, props, 0, 0, this.ghostRot);
-      const x = snap(this.cursor.x - r0.w / 2);
-      const y = snap(this.cursor.y - r0.h / 2);
+      const { x, y } = alignPlacement(design, { kind, kv: s.tool.kv, props, rot: this.ghostRot, x: snap(this.cursor.x - r0.w / 2), y: snap(this.cursor.y - r0.h / 2) });
       const rect = previewRect(kind, s.tool.kv, props, x, y, this.ghostRot);
       ghost = { kind, kv: s.tool.kv, props, x, y, rot: this.ghostRot, blocked: placementBlocked(design, level, rect) };
     }
@@ -268,7 +268,9 @@ export class EditorController {
         const base = store.get().design!;
         const ddx = snap(wp.x - this.drag.startWorld.x);
         const ddy = snap(wp.y - this.drag.startWorld.y);
-        this.dragPreview = moveItem(base, this.drag.itemId!, this.drag.itemStart!.x + ddx, this.drag.itemStart!.y + ddy);
+        const moving = base.items.find((i) => i.id === this.drag!.itemId);
+        const to = moving ? alignPlacement(base, { ...moving, x: this.drag.itemStart!.x + ddx, y: this.drag.itemStart!.y + ddy }, moving.id) : { x: this.drag.itemStart!.x + ddx, y: this.drag.itemStart!.y + ddy };
+        this.dragPreview = moveItem(base, this.drag.itemId!, to.x, to.y);
       } else if (this.drag.kind === 'fence') {
         const a = this.drag.startWorld;
         const b = this.cursor;
@@ -450,8 +452,7 @@ export class EditorController {
     const kind = s.tool.item;
     const props = { ...(kind === 'transformer' || kind === 'mobile_pad' ? transformerProps(level) : {}), ...defaultPropsFor(kind) };
     const r0 = previewRect(kind, s.tool.kv, props, 0, 0, this.ghostRot);
-    const x = snap(wp.x - r0.w / 2);
-    const y = snap(wp.y - r0.h / 2);
+    const { x, y } = alignPlacement(design, { kind, kv: s.tool.kv, props, rot: this.ghostRot, x: snap(wp.x - r0.w / 2), y: snap(wp.y - r0.h / 2) });
     const rect = previewRect(kind, s.tool.kv, props, x, y, this.ghostRot);
     const blocked = placementBlocked(design, level, rect);
     if (blocked) {

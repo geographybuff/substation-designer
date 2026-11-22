@@ -233,6 +233,8 @@ export interface TutorialStep {
   until?: string;
   /** Item kind to highlight in the toolbox. */
   highlightTool?: string;
+  /** Objective this step teaches: the tutorial card offers its "Show me" help. */
+  objective?: ObjectiveKind;
 }
 
 export interface LevelDef {

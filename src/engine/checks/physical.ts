@@ -8,10 +8,21 @@ import { ALTITUDE_CITES, clearanceClassFor, isHighAltitude } from '../site';
 /** Table 4-7 clearances, plus the §4.9 altitude procedure above 1000 m. */
 const clearanceCites = () => (isHighAltitude() ? [VOLTAGE_CLASS_CITES.clearances, ALTITUDE_CITES.clearances] : [VOLTAGE_CLASS_CITES.clearances]);
 import { busHeight, CATALOG } from '../catalog';
-import { distToRectBoundary, pointInRect, rectContainsRect, rectGap, rectInsetFrom, rectsOverlap, segRectDist, segments } from '../geometry';
+import { distToRectBoundary, offsetPolyline, pointInRect, rectContainsRect, rectGap, rectInsetFrom, rectsOverlap, segRectDist, segSegDist, segments } from '../geometry';
 import { footprintOf, itemLabel, itemPorts, itemRect } from '../items';
 import type { Topology } from '../topology';
 import type { Conductor, Design, Finding, LevelDef, PlacedItem, Rect, Vec2 } from '../types';
+
+/** Cosine between a terminal's outward direction and the bus leaving it from point p (-2 when the bus does not end at p). */
+function entryDot(c: Conductor, p: Vec2, dir: Vec2): number {
+  const n = c.points.length;
+  if (n < 2) return -2;
+  const near = (a: Vec2) => Math.abs(a.x - p.x) < 1e-6 && Math.abs(a.y - p.y) < 1e-6;
+  const q = near(c.points[0]!) ? c.points[1]! : near(c.points[n - 1]!) ? c.points[n - 2]! : null;
+  if (!q) return -2;
+  const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+  return ((q.x - p.x) * dir.x + (q.y - p.y) * dir.y) / len;
+}
 
 export const CITE_REMOVAL = { page: 120, section: '4.2.6', figure: '4-1' } as const;
 export const CITE_EXPANSION = { page: 119, section: '4.2.3' } as const;
@@ -231,6 +242,74 @@ export function checkPhysical(design: Design, level: LevelDef, topo: Topology): 
           cite: clearanceCites(),
         });
       }
+    }
+  }
+
+  // The three phases of one bus also need Table 4-7 metal-to-metal clearance from each other:
+  // a jog or U-turn shorter than two phase spacings folds the outer phases into each other.
+  const portsAt = new Map<string, { item: PlacedItem; dir: Vec2 }>();
+  const pk = (p: Vec2) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)}`;
+  for (const it of design.items) for (const p of itemPorts(it)) portsAt.set(pk(p.pos), { item: it, dir: p.dir });
+  for (const c of conds) {
+    const vc = clearanceClassFor(c.kv);
+    const sp = vc.rigidBusPhaseSpacingM;
+    const lines = [-1, 0, 1].map((k) => offsetPolyline(c.points, false, k * sp));
+    let dmin = Infinity;
+    let at: Vec2 | undefined;
+    for (let i = 0; i < 3; i++) {
+      for (let j = i + 1; j < 3; j++) {
+        for (const [a, b] of segments(lines[i]!)) {
+          for (const [p, q] of segments(lines[j]!)) {
+            const d = segSegDist(a, b, p, q);
+            if (d < dmin) {
+              dmin = d;
+              at = { x: (a.x + b.x + p.x + q.x) / 4, y: (a.y + b.y + p.y + q.y) / 4 };
+            }
+          }
+        }
+      }
+    }
+    if (dmin < vc.minMetalToMetalM - 1e-6) {
+      // Name the equipment at the nearer end: moving it is usually the fix.
+      const ends = [c.points[0]!, c.points[c.points.length - 1]!]
+        .map((p) => ({ p, port: portsAt.get(pk(p)) }))
+        .filter((e) => e.port && at)
+        .sort((x, y) => Math.hypot(x.p.x - at!.x, x.p.y - at!.y) - Math.hypot(y.p.x - at!.x, y.p.y - at!.y));
+      const item = ends[0]?.port?.item;
+      out.push({
+        id: fid('clear.selfphase'),
+        checkId: 'clear.selfphase',
+        severity: 'critical',
+        category: 'clearance',
+        title: `${c.kv} kV bus folds into itself at a tight jog${item ? ` near ${itemLabel(item)}` : ''}`,
+        detail: `This bus steps sideways by less than two phase spacings (${(2 * sp).toFixed(2)} m), so its phases come ${Math.max(0, dmin).toFixed(2)} m apart; Table 4-7 minimum metal-to-metal clearance is ${vc.minMetalToMetalM.toFixed(3)} m. Line the equipment up so the bus runs straight.`,
+        conductorIds: [c.id],
+        itemIds: item ? [item.id] : undefined,
+        at,
+        cite: clearanceCites(),
+      });
+    }
+    // A bus should leave a terminal straight out; arriving from the side crosses the phase connections.
+    // A branch off a bus that itself runs straight into the terminal (e.g. line-entrance arresters) is fine.
+    for (const end of [0, 1] as const) {
+      const p = end === 0 ? c.points[0]! : c.points[c.points.length - 1]!;
+      const port = portsAt.get(pk(p));
+      if (!port) continue;
+      const dot = entryDot(c, p, port.dir);
+      if (dot > 0.7) continue;
+      if (conds.some((o) => o !== c && entryDot(o, p, port.dir) > 0.7)) continue;
+      out.push({
+        id: fid('conn.sideentry'),
+        checkId: 'conn.sideentry',
+        severity: 'major',
+        category: 'clearance',
+        title: `Bus enters ${itemLabel(port.item)} from the side`,
+        detail: `The bus reaches this terminal at right angles${dot < -0.7 ? ' (from behind)' : ''}, so its three phases arrive lined up along the terminal and the connections to the bushings squeeze together or cross instead of keeping the phase spacing (Table 4-7). Run the bus straight out of the terminal: line the equipment up with the bus.`,
+        conductorIds: [c.id],
+        itemIds: [port.item.id],
+        at: p,
+        cite: clearanceCites(),
+      });
     }
   }
 

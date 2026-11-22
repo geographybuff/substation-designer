@@ -3,16 +3,22 @@
  * phase, offset by the phase spacing with mitred corners) at the conductor
  * height, carried on station-post bus supports.
  *
- * Junctions: two conductor ends meeting at a free point are joined into one
- * continuous run (so corners mitre cleanly). A conductor ending on another run
- * is a tap: it is drawn lower (by the phase-to-phase clearance) and each phase
- * rises vertically to its own phase of the main run, so taps never visually
- * short across the main bus. Ends at a device port get flexible jumpers to that
- * device's terminals.
+ * Junctions: conductors are first split wherever one ends on another, so every
+ * junction is a point where conductor ends meet and the picture depends only on
+ * the electrical junction, not on the order the player drew the buses in. At
+ * each junction the straightest pair of branches is joined into one continuous
+ * run (two ends alone always join, so corners mitre cleanly). A second straight
+ * pair crosses beneath that run, and any other branch is a tap. Crossing runs and
+ * taps are drawn one level lower and each phase rises vertically to its own phase
+ * of the run above, so they never visually short across it. Ends at a device
+ * port get flexible jumpers to that device's terminals.
  */
 import type { LineBasicMaterial, Vector3 } from 'three';
 import type { SceneModel } from '../engine/scene';
+import { offsetPolyline } from '../engine/geometry';
 import type { Vec2 } from '../engine/types';
+
+export { offsetPolyline };
 import type { LineBatch, PartBatch } from './batch';
 import { column, girder, postHeight, vclass } from './models/common';
 import type { Parts } from './parts';
@@ -39,8 +45,10 @@ export interface Chain {
   closed: boolean;
   start: EndKind;
   end: EndKind;
-  /** How far the run is lowered below its nominal height (taps). */
+  /** How far the run is lowered below its nominal height (taps and crossing runs). */
   drop: number;
+  /** Junctions where this run passes straight beneath another run and connects to it. */
+  crossings: Vec2[];
 }
 
 const EPS = 0.02;
@@ -68,46 +76,69 @@ export function pipeRadius(kv: number): number {
   return kv <= 38 ? 0.038 : kv <= 72.5 ? 0.046 : kv <= 169 ? 0.056 : 0.066;
 }
 
-/** Offset polyline by `o` along the left normal with mitred joints. */
-export function offsetPolyline(pts: readonly Vec2[], closed: boolean, o: number): Vec2[] {
-  const n = pts.length;
-  const segN: Vec2[] = [];
-  for (let i = 0; i + 1 < n; i++) {
-    const d = unit(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
-    segN.push({ x: -d.y, y: d.x });
-  }
-  const out: Vec2[] = [];
-  for (let i = 0; i < n; i++) {
-    let n0 = i > 0 ? segN[i - 1] : closed ? segN[segN.length - 1] : undefined;
-    let n1 = i < n - 1 ? segN[i] : closed ? segN[0] : undefined;
-    n0 = n0 ?? n1!;
-    n1 = n1 ?? n0;
-    let mx = n0.x + n1.x;
-    let my = n0.y + n1.y;
-    const ml = Math.hypot(mx, my);
-    if (ml < 1e-6) {
-      mx = n0.x;
-      my = n0.y;
-    } else {
-      mx /= ml;
-      my /= ml;
-    }
-    const cos = mx * n0.x + my * n0.y;
-    const s = o / Math.max(0.25, cos);
-    out.push({ x: pts[i]!.x + mx * s, y: pts[i]!.y + my * s });
-  }
-  return out;
+/** Vertical step between bus levels at a junction: at least the Table 4-7 metal-to-metal clearance plus margin. */
+export function levelStep(kv: number, height: number): number {
+  const vc = vclass(kv);
+  const base = vc.minMetalToMetalM + 0.15;
+  const room = height - vc.groundClearanceM - 0.1;
+  return Math.max(base, Math.min(Math.max(base, vc.rigidBusPhaseSpacingM), room));
 }
+
+type SC = SceneModel['conductors'][number];
+interface Piece {
+  c: SC;
+  pts: Vec2[];
+}
+
+/** Split `pc` where `pt` lies on its interior (on a segment or at an inner vertex). */
+function splitPiece(pc: Piece, pt: Vec2): [Piece, Piece] | null {
+  const pts = pc.pts;
+  if (near(pts[0]!, pt) || near(pts[pts.length - 1]!, pt)) return null;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    if (pointSegDist(pt, pts[i]!, pts[i + 1]!) > EPS) continue;
+    if (near(pts[i + 1]!, pt)) return [{ c: pc.c, pts: pts.slice(0, i + 2) }, { c: pc.c, pts: pts.slice(i + 1) }];
+    const q = { x: pt.x, y: pt.y };
+    return [
+      { c: pc.c, pts: [...pts.slice(0, i + 1), q] },
+      { c: pc.c, pts: [q, ...pts.slice(i + 1)] },
+    ];
+  }
+  return null;
+}
+
+const pieceLen = (pts: readonly Vec2[]) => {
+  let l = 0;
+  for (let i = 0; i + 1 < pts.length; i++) l += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y);
+  return l;
+};
 
 /** Group conductors into continuous runs and classify their ends. Pure: exported for tests. */
 export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readonly PortRef[]): Chain[] {
-  const conds = model.conductors
+  let conds: Piece[] = model.conductors
     .map((c) => {
       const pts: Vec2[] = [];
       for (const p of c.points) if (!pts.length || !near(pts[pts.length - 1]!, p)) pts.push({ x: p.x, y: p.y });
       return { c, pts };
     })
     .filter((x) => x.pts.length >= 2);
+
+  // Split runs wherever another run ends on them, so junctions are always shared end points.
+  for (let guard = 0; guard < 200; guard++) {
+    const ends = conds.flatMap((p) => [p.pts[0]!, p.pts[p.pts.length - 1]!]);
+    let hit = -1;
+    let parts: [Piece, Piece] | null = null;
+    for (let pi = 0; pi < conds.length && !parts; pi++) {
+      for (const e of ends) {
+        parts = splitPiece(conds[pi]!, e);
+        if (parts) {
+          hit = pi;
+          break;
+        }
+      }
+    }
+    if (!parts) break;
+    conds = [...conds.slice(0, hit), ...parts, ...conds.slice(hit + 1)];
+  }
 
   const portIndex = new Map<string, PortRef[]>();
   for (const p of ports) {
@@ -146,6 +177,7 @@ export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readon
 
   const join = new Map<string, CEnd>();
   const kinds = new Map<string, EndKind>();
+  const crossPieces: Array<{ ci: number; at: Vec2 }> = [];
   for (const [k, ends] of nodes) {
     const pt = endPt(ends[0]!);
     const prts = portIndex.get(k);
@@ -161,34 +193,52 @@ export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readon
       kinds.set(ek(ends[0]!), { t: 'free' });
       continue;
     }
-    let best: [CEnd, CEnd] | null = null;
-    let bestScore = 0.7;
+    // Candidate pairs, straightest first; among equally straight pairs the longer one is the main run
+    // (then the more east-west one), so the choice never depends on drawing order.
+    const pairs: Array<{ a: CEnd; b: CEnd; score: number; len: number; ew: number }> = [];
     for (let i = 0; i < ends.length; i++) {
       for (let j = i + 1; j < ends.length; j++) {
         const a = ends[i]!;
         const b = ends[j]!;
         const ca = conds[a.ci]!.c;
         const cb = conds[b.ci]!.c;
+        if (a.ci === b.ci) continue;
         if (Math.abs(ca.height - cb.height) > 1e-3 || Math.abs(ca.phaseSpacing - cb.phaseSpacing) > 1e-3) continue;
         const da = outDir(a);
         const db = outDir(b);
-        const score = da.x * db.x + da.y * db.y;
-        if (score < bestScore) {
-          bestScore = score;
-          best = [a, b];
-        }
+        pairs.push({ a, b, score: da.x * db.x + da.y * db.y, len: pieceLen(conds[a.ci]!.pts) + pieceLen(conds[b.ci]!.pts), ew: Math.abs(da.x) });
       }
     }
-    if (best) {
-      join.set(ek(best[0]), best[1]);
-      join.set(ek(best[1]), best[0]);
-      for (const e of ends) if (e !== best[0] && e !== best[1]) kinds.set(ek(e), { t: 'tee', at: pt });
+    const straight = (q: (typeof pairs)[number]) => q.score < -0.7;
+    pairs.sort((p, q) => {
+      const sp = Number(straight(q)) - Number(straight(p));
+      if (sp) return sp;
+      if (!straight(p) && Math.abs(p.score - q.score) > 1e-6) return p.score - q.score;
+      if (Math.abs(p.len - q.len) > 1e-6) return q.len - p.len;
+      return q.ew - p.ew;
+    });
+    const taken = new Set<string>();
+    const free = (e: CEnd) => !taken.has(ek(e));
+    const main = pairs.find((q) => q.score < 0.7);
+    if (main) {
+      join.set(ek(main.a), main.b);
+      join.set(ek(main.b), main.a);
+      taken.add(ek(main.a)).add(ek(main.b));
+      const cross = pairs.find((q) => straight(q) && free(q.a) && free(q.b));
+      if (cross) {
+        join.set(ek(cross.a), cross.b);
+        join.set(ek(cross.b), cross.a);
+        taken.add(ek(cross.a)).add(ek(cross.b));
+        crossPieces.push({ ci: cross.a.ci, at: pt });
+      }
+      for (const e of ends) if (free(e)) kinds.set(ek(e), { t: 'tee', at: pt });
     } else {
       for (const e of ends) kinds.set(ek(e), { t: 'free' });
     }
   }
 
   const used = new Array<boolean>(conds.length).fill(false);
+  const chainOf = new Array<number>(conds.length).fill(-1);
   const chains: Chain[] = [];
   for (let ci = 0; ci < conds.length; ci++) {
     if (used[ci]) continue;
@@ -222,6 +272,7 @@ export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readon
     for (;;) {
       visited.add(x);
       used[x] = true;
+      chainOf[x] = chains.length;
       const { c, pts: cp0 } = conds[x]!;
       const cp = startEnd === 1 ? [...cp0].reverse() : cp0;
       for (let i = 0; i < cp.length; i++) {
@@ -242,9 +293,6 @@ export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readon
       startEnd = pr.end;
     }
     const c0 = conds[ci]!.c;
-    const start = closed ? ({ t: 'free' } as EndKind) : headKind;
-    const end = closed ? ({ t: 'free' } as EndKind) : tailKind;
-    const tee = start.t === 'tee' || end.t === 'tee';
     chains.push({
       pts,
       owners,
@@ -253,11 +301,32 @@ export function buildChains(model: Pick<SceneModel, 'conductors'>, ports: readon
       sp: c0.phaseSpacing,
       kv: c0.kv,
       closed,
-      start,
-      end,
-      drop: tee ? vclass(c0.kv).minMetalToMetalM + 0.15 : 0,
+      start: closed ? { t: 'free' } : headKind,
+      end: closed ? { t: 'free' } : tailKind,
+      drop: 0,
+      crossings: [],
     });
   }
+  for (const cp of crossPieces) chains[chainOf[cp.ci]!]!.crossings.push(cp.at);
+
+  // Levels: a tap or crossing run sits one level below the run it connects to (at most two levels).
+  const level = chains.map(() => 0);
+  const attachments = chains.map((ch, idx) => {
+    const at = [...ch.crossings];
+    for (const k of [ch.start, ch.end]) if (k.t === 'tee') at.push(k.at);
+    return at.map((J) => chains.findIndex((m, mi) => mi !== idx && !m.crossings.some((q) => near(q, J)) && m.pts.some((_, i) => i + 1 < m.pts.length && pointSegDist(J, m.pts[i]!, m.pts[i + 1]!) <= EPS)));
+  });
+  for (let it = 0; it < 3; it++) {
+    attachments.forEach((ms, idx) => {
+      for (const mi of ms) if (mi >= 0) level[idx] = Math.max(level[idx]!, Math.min(2, level[mi]! + 1));
+    });
+  }
+  chains.forEach((ch, idx) => {
+    if (!level[idx]) return;
+    const step = levelStep(ch.kv, ch.height);
+    const room = Math.max(step, ch.height - vclass(ch.kv).groundClearanceM - 0.1);
+    ch.drop = Math.max(step, Math.min(level[idx]! * step, room));
+  });
   return chains;
 }
 
@@ -276,7 +345,15 @@ function jumpers(ctx: Ctx, phase: readonly Vec2[], h: number, port: PortRef): vo
   const ax = -port.dir.y;
   const ay = port.dir.x;
   const P = phase.map((q) => ({ q, s: q.x * ax + q.y * ay })).sort((a, b) => a.s - b.s);
-  const Ts = T.map((t) => ({ t, s: t.x * ax + t.z * ay })).sort((a, b) => a.s - b.s);
+  let Ts = T.map((t) => ({ t, s: t.x * ax + t.z * ay })).sort((a, b) => a.s - b.s);
+  // Pair phases with terminals so the jumpers are shortest overall: for a straight entry that is the
+  // sorted order; for a bus arriving from the side it nests them instead of crossing them at random.
+  if (Ts.length === P.length && P.length === 3) {
+    const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    const cost = (pm: number[]) => pm.reduce((sum, j, i) => sum + (Ts[j]!.t.x - P[i]!.q.x) ** 2 + (Ts[j]!.t.z - P[i]!.q.y) ** 2, 0);
+    const best = perms.reduce((a, b) => (cost(b) < cost(a) - 1e-9 ? b : a));
+    Ts = best.map((j) => Ts[j]!);
+  }
   for (let i = 0; i < P.length; i++) {
     const q = P[i]!.q;
     let t = Ts.length === P.length ? Ts[i]!.t : Ts[0]!.t;
@@ -392,6 +469,64 @@ export function buildConductors(p: Parts, batch: PartBatch, model: SceneModel, p
     }
   });
 
+  // Crossing runs: pass straight beneath the run above; each phase rises to its own phase line.
+  chains.forEach((ch, idx) => {
+    for (const J of ch.crossings) {
+      const vi = ch.pts.findIndex((q) => near(q, J));
+      if (vi < 0) continue;
+      const a = ch.pts[Math.max(0, vi - 1)]!;
+      const b = ch.pts[Math.min(ch.pts.length - 1, vi + 1)]!;
+      const u = unit(b.x - a.x, b.y - a.y);
+      let best: { m: number; v: Vec2; score: number } | null = null;
+      chains.forEach((m, mi) => {
+        if (mi === idx) return;
+        for (let i = 0; i + 1 < m.pts.length; i++) {
+          if (pointSegDist(J, m.pts[i]!, m.pts[i + 1]!) > EPS) continue;
+          const v = unit(m.pts[i + 1]!.x - m.pts[i]!.x, m.pts[i + 1]!.y - m.pts[i]!.y);
+          const score = Math.abs(u.x * v.x + u.y * v.y);
+          if (!best || score < best.score) best = { m: mi, v, score };
+        }
+      });
+      if (!best) continue;
+      const { m: mi, v, score } = best as { m: number; v: Vec2; score: number };
+      if (score > 0.7) continue;
+      const main = chains[mi]!;
+      const nM = { x: -v.y, y: v.x };
+      const dn = nM.x * u.x + nM.y * u.y;
+      const lines = [-1, 0, 1].map((j) => j * main.sp * dn).sort((p, q) => p - q);
+      const ph = phases[idx]!;
+      const order = [0, 1, 2].sort((p, q) => {
+        const pa = ph[p]![vi]!;
+        const pb = ph[q]![vi]!;
+        return pa.x * v.x + pa.y * v.y - (pb.x * v.x + pb.y * v.y);
+      });
+      const owner = ch.owners[Math.min(vi, ch.owners.length - 1)]!;
+      order.forEach((k, rank) => {
+        const P = ph[k]![vi]!;
+        const t = lines[rank]! - ((P.x - J.x) * u.x + (P.y - J.y) * u.y);
+        risers.push({ owner, x: P.x + u.x * t, z: P.y + u.y * t, y0: ch.height - ch.drop, y1: main.height - main.drop, r: pipeRadius(ch.kv) * 0.85 });
+      });
+    }
+  });
+
+  // Junctions on each run (where another run taps or crosses beneath): bus supports keep clear of them.
+  const junctions: Vec2[][] = chains.map(() => []);
+  chains.forEach((ch, idx) => {
+    const at = [...ch.crossings];
+    for (const k of [ch.start, ch.end]) if (k.t === 'tee') at.push(k.at);
+    for (const J of at) {
+      chains.forEach((m, mi) => {
+        if (mi === idx) return;
+        for (let i = 0; i + 1 < m.pts.length; i++) {
+          if (pointSegDist(J, m.pts[i]!, m.pts[i + 1]!) <= EPS) {
+            junctions[mi]!.push(J);
+            return;
+          }
+        }
+      });
+    }
+  });
+
   let hasLive = false;
   const supportKeys = new Set<string>();
   chains.forEach((ch, idx) => {
@@ -451,13 +586,36 @@ export function buildConductors(p: Parts, batch: PartBatch, model: SceneModel, p
       busSupport(p, pts3, h, ch.kv);
     };
     for (const an of anchors) if (an.support) place([ph[0]![an.vi]!, ph[1]![an.vi]!, ph[2]![an.vi]!]);
+    // Run coordinate of each junction on this run, and how far supports must stay from it.
+    const keep = 1.5 * ch.sp + 0.6;
+    const js = junctions[idx]!.map((J) => {
+      let best = 0;
+      let bd = Infinity;
+      for (let i = 0; i + 1 < n; i++) {
+        const a = ch.pts[i]!;
+        const b = ch.pts[i + 1]!;
+        const dd = pointSegDist(J, a, b);
+        if (dd < bd) {
+          bd = dd;
+          best = cum[i]! + Math.hypot(J.x - a.x, J.y - a.y);
+        }
+      }
+      return best;
+    });
     for (let ai = 0; ai + 1 < anchors.length; ai++) {
       const s0 = anchors[ai]!.s;
       const s1 = anchors[ai + 1]!.s;
       const L = s1 - s0;
       const extra = Math.ceil(L / MAX_SPAN - 1e-6) - 1;
       for (let j = 1; j <= extra; j++) {
-        const s = s0 + (L * j) / (extra + 1);
+        let s = s0 + (L * j) / (extra + 1);
+        const sj = js.find((q) => Math.abs(q - s) < keep);
+        if (sj !== undefined) {
+          const lo = sj - keep;
+          const hi = sj + keep;
+          s = s - lo < hi - s && lo > s0 + 0.5 ? lo : hi < s1 - 0.5 ? hi : lo > s0 + 0.5 ? lo : NaN;
+          if (!Number.isFinite(s) || js.some((q) => Math.abs(q - s) < keep - 1e-6)) continue;
+        }
         let si = 0;
         while (si + 2 < n && cum[si + 1]! < s) si++;
         const a = ch.pts[si]!;

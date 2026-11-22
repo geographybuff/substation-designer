@@ -111,6 +111,95 @@ export function moveItem(design: Design, id: string, x: number, y: number): Desi
   return { ...design, items: design.items.map((i) => (i.id === id ? moved : i)), conductors };
 }
 
+/**
+ * Alignment guide for placing or dragging equipment: if one of the item's
+ * terminals sits slightly off the line of a terminal or bus point in front of it
+ * (within `tol` across, up to 20 m ahead), slide the item across so they line up
+ * and the bus can run straight in. Returns the (possibly unchanged) position.
+ */
+export function alignPlacement(design: Design, cand: Pick<PlacedItem, 'kind' | 'kv' | 'props' | 'rot' | 'x' | 'y'>, ignoreId?: string, tol = 0.75): { x: number; y: number } {
+  const ports = itemPorts({ ...cand, id: '_' });
+  const targets: Array<{ pos: Vec2; dir?: Vec2 }> = [];
+  for (const it of design.items) if (it.id !== ignoreId) for (const p of itemPorts(it)) targets.push({ pos: p.pos, dir: p.dir });
+  for (const c of design.conductors) for (const p of c.points) targets.push({ pos: p });
+  let best: { shift: Vec2; perp: number; along: number } | null = null;
+  for (const p of ports) {
+    const D = p.dir;
+    const n = { x: -D.y, y: D.x };
+    for (const t of targets) {
+      const dx = t.pos.x - p.pos.x;
+      const dy = t.pos.y - p.pos.y;
+      const along = dx * D.x + dy * D.y;
+      const perp = dx * n.x + dy * n.y;
+      if (along < -1e-6 || along > 20 || Math.abs(perp) < 1e-6 || Math.abs(perp) > tol) continue;
+      if (t.dir && t.dir.x * D.x + t.dir.y * D.y > -0.7) continue; // a terminal must face back towards this one
+      if (!best || Math.abs(perp) < Math.abs(best.perp) - 1e-9 || (Math.abs(Math.abs(perp) - Math.abs(best.perp)) < 1e-9 && along < best.along)) {
+        best = { shift: { x: n.x * perp, y: n.y * perp }, perp, along };
+      }
+    }
+  }
+  return best ? { x: cand.x + best.shift.x, y: cand.y + best.shift.y } : { x: cand.x, y: cand.y };
+}
+
+/**
+ * Slide an item sideways (across its terminal direction) so the terminal where
+ * `conductorId` ends lines up with the straight run of that bus beyond its jog.
+ * Every bus attached to the item keeps its straight run next to the terminal and
+ * loses the jog. Returns null when that cannot be done cleanly (no straight run to
+ * line up with, a bus would have to move at its far end too, or the new spot is taken).
+ */
+export function alignItemToBus(design: Design, level: LevelDef, itemId: string, conductorId: string): Design | null {
+  const it = design.items.find((i) => i.id === itemId);
+  const cond = design.conductors.find((c) => c.id === conductorId);
+  if (!it || it.locked || !cond || cond.points.length < 2) return null;
+  const ports = itemPorts(it);
+  const endAt = (c: Conductor) => {
+    for (const p of ports) {
+      if (samePoint(c.points[0]!, p.pos)) return { port: p, pts: c.points };
+      if (samePoint(c.points[c.points.length - 1]!, p.pos)) return { port: p, pts: [...c.points].reverse() };
+    }
+    return null;
+  };
+  const e = endAt(cond);
+  if (!e) return null;
+  const D = e.port.dir;
+  const along = (a: Vec2, b: Vec2) => Math.abs((b.x - a.x) * D.y - (b.y - a.y) * D.x) < 1e-9; // segment parallel to D
+  // The first run parallel to the terminal direction after at least one sideways segment.
+  let target: Vec2 | null = null;
+  let sawSide = false;
+  for (let i = 0; i + 1 < e.pts.length; i++) {
+    if (!along(e.pts[i]!, e.pts[i + 1]!)) sawSide = true;
+    else if (sawSide) {
+      target = e.pts[i]!;
+      break;
+    }
+  }
+  if (!target) return null;
+  const P = e.port.pos;
+  const n = { x: -D.y, y: D.x };
+  const off = (target.x - P.x) * n.x + (target.y - P.y) * n.y;
+  if (Math.abs(off) < 1e-9) return null;
+  const delta = { x: n.x * off, y: n.y * off };
+  const conductors: Conductor[] = [];
+  for (const c of design.conductors) {
+    const a = endAt(c);
+    if (!a) {
+      conductors.push(c);
+      continue;
+    }
+    const pts = a.pts.map((p) => ({ ...p }));
+    let k = 0;
+    while (k + 1 < pts.length && along(a.pts[k]!, a.pts[k + 1]!)) k++;
+    if (k === pts.length - 1) return null; // the whole bus would have to move
+    for (let i = 0; i <= k; i++) pts[i] = { x: pts[i]!.x + delta.x, y: pts[i]!.y + delta.y };
+    const fwd = a.pts === c.points ? pts : pts.reverse();
+    conductors.push({ ...c, points: simplify(fwd) });
+  }
+  const moved: PlacedItem = { ...it, x: it.x + delta.x, y: it.y + delta.y };
+  if (placementBlocked(design, level, itemRect(moved), it.id)) return null;
+  return { ...design, items: design.items.map((i) => (i.id === itemId ? moved : i)), conductors };
+}
+
 function portPositions(it: PlacedItem, fp = footprintOf(it)): Vec2[] {
   return itemPorts(it, fp).map((p) => p.pos);
 }

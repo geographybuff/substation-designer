@@ -4,8 +4,10 @@ import type { DesignReview } from '../../engine/review';
 import type { Design, Finding, LevelDef } from '../../engine/types';
 import { CiteLink, money } from './Inspector';
 import { store } from '../store';
+import { helpForFinding, helpForObjective, type HelpCtx } from '../../content/help';
+import { HelpToggle, type HelpActions } from './HelpPanel';
 
-export function FindingRow({ f, onClick }: { f: Finding; onClick?: () => void }) {
+export function FindingRow({ f, onClick, help }: { f: Finding; onClick?: () => void; help?: { ctx: HelpCtx; actions: HelpActions } }) {
   return (
     <div class={`finding ${f.severity}`} onClick={onClick} data-testid="finding">
       <div class={`sev ${f.severity}`}>{f.severity}</div>
@@ -18,13 +20,37 @@ export function FindingRow({ f, onClick }: { f: Finding; onClick?: () => void })
           ))}
         </div>
       )}
+      {help && <HelpToggle key={f.checkId} help={withFindingItems(helpForFinding(f, help.ctx), f)} actions={help.actions} />}
     </div>
   );
 }
 
-export function ReviewPanel({ review, level, design, stale, onFocus }: { review: DesignReview | null; level: LevelDef; design: Design; stale: boolean; onFocus: (f: Finding) => void }) {
+/** "Show me" for a finding frames its own items unless the help names others. */
+function withFindingItems(h: ReturnType<typeof helpForFinding>, f: Finding) {
+  if (!h) return h;
+  const own = [...(f.itemIds ?? []), ...(f.conductorIds ?? [])];
+  return h.itemIds?.length || !own.length ? h : { ...h, itemIds: own };
+}
+
+export function ReviewPanel({
+  review,
+  level,
+  design,
+  stale,
+  onFocus,
+  helpActions,
+}: {
+  review: DesignReview | null;
+  level: LevelDef;
+  design: Design;
+  stale: boolean;
+  onFocus: (f: Finding) => void;
+  /** Campaign help ("Help me fix this"); omitted in the sandbox or when tips are off. */
+  helpActions?: HelpActions;
+}) {
   if (!review) return <div class="muted">Reviewing…</div>;
   const { counts } = review;
+  const help = helpActions ? { ctx: { level, design, review }, actions: helpActions } : undefined;
   const g = review.grounding;
   const xfmrs = design.items.filter((i) => i.kind === 'transformer');
   return (
@@ -40,12 +66,13 @@ export function ReviewPanel({ review, level, design, stale, onFocus }: { review:
         <>
           <h4 style={{ margin: '.9em 0 .3em' }}>Objectives</h4>
           {review.objectives.map((o) => (
-            <div key={o.objective.id} class={`objective ${o.met ? 'met' : ''}`}>
+            <div key={o.objective.id} class={`objective ${o.met ? 'met' : ''}`} data-testid={`objective-${o.objective.kind}`}>
               <span class="box">{o.met ? '✓' : ''}</span>
-              <span>
+              <span style={{ flex: 1 }}>
                 {o.objective.text}
                 {o.objective.optional && <span class="muted small"> (optional)</span>}
                 {o.note && <span class="muted small"> — {o.note}</span>}
+                {help && !o.met && <HelpToggle help={helpForObjective(o, help.ctx)} actions={help.actions} testId={`help-toggle-${o.objective.kind}`} />}
               </span>
             </div>
           ))}
@@ -136,7 +163,7 @@ export function ReviewPanel({ review, level, design, stale, onFocus }: { review:
       <h4 style={{ margin: '.9em 0 .3em' }}>Findings</h4>
       {review.findings.length === 0 && <div class="muted small">No findings. Nice work.</div>}
       {review.findings.map((f) => (
-        <FindingRow key={f.id} f={f} onClick={() => onFocus(f)} />
+        <FindingRow key={f.id} f={f} onClick={() => onFocus(f)} help={help} />
       ))}
       <div style={{ marginTop: '.8em' }}>
         <button class="btn small" onClick={() => store.set({ showBriefing: true })}>

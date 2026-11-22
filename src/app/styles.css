@@ -134,6 +134,18 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 .objective { display: flex; gap: .5em; align-items: flex-start; margin: .3em 0; font-size: .9em; }
 .objective .box { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); flex: none; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
 .objective.met .box { background: var(--ok); border-color: var(--ok); color: #052e16; }
+/* Campaign help ("Help me fix this") */
+.help { margin-top: .3em; cursor: default; }
+.help-link { background: none; border: 0; padding: 0; color: var(--accent2); font: inherit; font-size: .8em; cursor: pointer; }
+.help-link:hover { text-decoration: underline; }
+.help-body { margin-top: .35em; padding: .55em .65em; background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; font-size: .84em; }
+.help-what { margin: 0 0 .4em; }
+.help-steps { margin: 0 0 .5em; padding-left: 1.3em; }
+.help-steps li { margin: .2em 0; }
+.help-actions { display: flex; gap: .4em; flex-wrap: wrap; }
+.help-diagram { margin: .2em 0 .55em; }
+.help-diagram svg { width: 100%; max-width: 320px; height: auto; display: block; background: #0f172a; border-radius: 6px; }
+.help-diagram figcaption { color: var(--dim); font-size: .92em; margin-top: .3em; }
 .metric { display: flex; justify-content: space-between; font-size: .88em; padding: .2em 0; border-bottom: 1px dashed #2a3a4a; }
 .metric b { font-variant-numeric: tabular-nums; }
 .overlay-bar { position: absolute; top: 10px; left: 10px; display: flex; gap: .35em; flex-wrap: wrap; z-index: 2; }

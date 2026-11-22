@@ -140,7 +140,14 @@ describe('conductors', () => {
     const chains = buildChains(model, ports);
     const main = chains.find((c) => c.owners.includes('BUS'))!;
     expect(new Set(main.owners)).toEqual(new Set(['BUS', 'C10', 'C16']));
-    expect(main.pts).toHaveLength(4);
+    // Runs are split where taps land, so count corners rather than vertices.
+    const corners = main.pts.filter((b, i) => {
+      if (i === 0 || i === main.pts.length - 1) return false;
+      const a = main.pts[i - 1]!;
+      const c = main.pts[i + 1]!;
+      return Math.abs((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)) > 1e-6;
+    });
+    expect(corners).toHaveLength(2);
     expect(main.drop).toBe(0);
     for (const tap of ['C5', 'C6', 'C12', 'C11', 'C17']) {
       const ch = chains.find((c) => c.owners.includes(tap))!;
@@ -150,8 +157,30 @@ describe('conductors', () => {
     const c1 = chains.find((c) => c.owners.includes('C1'))!;
     expect(c1.start.t).toBe('port');
     expect(c1.end.t).toBe('port');
-    // Every conductor is drawn exactly once.
-    expect(chains.flatMap((c) => [...new Set(c.owners)]).sort()).toEqual(model.conductors.map((c) => c.id).sort());
+    // Every conductor is drawn, and nothing else.
+    expect([...new Set(chains.flatMap((c) => c.owners))].sort()).toEqual(model.conductors.map((c) => c.id).sort());
+  });
+
+  it('draws a junction the same way whatever order its buses were drawn in', () => {
+    // A four-way junction at (10, 10): the vertical run is longer, so it is the main run.
+    const c = (id: string, ...pts: Array<[number, number]>) => ({ id, points: pts.map(([x, y]) => ({ x, y })), height: 4, phaseSpacing: 0.6, kv: 12.47, elevation: 'low' as const, energized: false });
+    const layouts = {
+      verticalThrough: [c('V', [10, 0], [10, 20]), c('W', [4, 10], [10, 10]), c('E', [10, 10], [14, 10])],
+      horizontalThrough: [c('H', [4, 10], [14, 10]), c('N', [10, 0], [10, 10]), c('S', [10, 10], [10, 20])],
+      cornerAndTaps: [c('L', [4, 10], [10, 10], [10, 0]), c('S', [10, 10], [10, 20]), c('E', [10, 10], [14, 10])],
+    };
+    const shape = (conds: ReturnType<typeof c>[]) =>
+      buildChains({ conductors: conds }, [])
+        .map((ch) => {
+          const xs = ch.pts.map((p) => p.x);
+          const ys = ch.pts.map((p) => p.y);
+          return `${Math.min(...xs)},${Math.min(...ys)}-${Math.max(...xs)},${Math.max(...ys)} drop=${ch.drop.toFixed(2)} cross=${ch.crossings.length}`;
+        })
+        .sort();
+    const ref = shape(layouts.verticalThrough);
+    expect(ref).toEqual(['10,0-10,20 drop=0.00 cross=0', '4,10-14,10 drop=0.61 cross=1']);
+    expect(shape(layouts.horizontalThrough)).toEqual(ref);
+    expect(shape(layouts.cornerAndTaps)).toEqual(ref);
   });
 });
 

@@ -114,7 +114,7 @@ export function Settings() {
               </select>
             </label>
             <Toggle label="Reduce motion" desc="No camera easing, flashes or animations" checked={g.reduceMotion} onChange={(v) => setGraphics({ ...g, reduceMotion: v })} />
-            <Toggle label="Show tips" checked={game.showTips} onChange={(v) => setGame({ ...game, showTips: v })} />
+            <Toggle label="Show tips" desc="&quot;Help me fix this&quot; and Show me in the campaign Review tab" checked={game.showTips} onChange={(v) => setGame({ ...game, showTips: v })} />
             <h3 style={{ marginTop: '1em' }}>Progress</h3>
             <button
               class="btn danger"

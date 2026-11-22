@@ -65,3 +65,26 @@ describe('First Light tutorial', () => {
     expect(stepPending('feeders_protected', r).join(' ')).toContain('Mill Road');
   });
 });
+
+describe('campaign tutorials', () => {
+  it('only use known completion conditions and objectives the level has', async () => {
+    const { TUTORIAL_CONDITIONS } = await import('../src/levels/tutorial');
+    for (const level of CAMPAIGN) {
+      for (const st of level.tutorial ?? []) {
+        if (st.until?.startsWith('objective:')) expect(level.objectives.map((o) => o.kind), `${level.id} ${st.id}`).toContain(st.until.slice(10));
+        else if (st.until) expect(Object.keys(TUTORIAL_CONDITIONS), `${level.id} ${st.id}`).toContain(st.until);
+        if (st.objective) expect(level.objectives.map((o) => o.kind), `${level.id} ${st.id}`).toContain(st.objective);
+        if (st.highlightTool && !['bus', 'fence'].includes(st.highlightTool)) expect(level.tools, `${level.id} ${st.id}`).toContain(st.highlightTool);
+      }
+    }
+    expect(CAMPAIGN.filter((l) => l.tutorial?.length).length).toBe(CAMPAIGN.length);
+  });
+
+  it('reference solutions complete every tutorial step', () => {
+    for (const level of CAMPAIGN) {
+      const d = SOLUTIONS[level.id]!();
+      const r = reviewDesign(d, level);
+      for (const st of level.tutorial ?? []) if (st.until) expect(stepDone(st.until, d, level, r), `${level.id} ${st.id}`).toBe(true);
+    }
+  });
+});
