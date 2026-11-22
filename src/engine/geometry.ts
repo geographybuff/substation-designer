@@ -202,3 +202,38 @@ export function newId(prefix: string, existing: Iterable<string>): string {
     if (!used.has(id)) return id;
   }
 }
+
+/** Offset polyline by `o` along the left normal with mitred joints. */
+/** Used for the three phase conductors of a bus in plan and 3D. */
+export function offsetPolyline(pts: readonly Vec2[], closed: boolean, o: number): Vec2[] {
+  const n = pts.length;
+  const segN: Vec2[] = [];
+  for (let i = 0; i + 1 < n; i++) {
+    const dx = pts[i + 1]!.x - pts[i]!.x;
+    const dy = pts[i + 1]!.y - pts[i]!.y;
+    const l = Math.hypot(dx, dy) || 1;
+    const d = { x: dx / l, y: dy / l };
+    segN.push({ x: -d.y, y: d.x });
+  }
+  const out: Vec2[] = [];
+  for (let i = 0; i < n; i++) {
+    let n0 = i > 0 ? segN[i - 1] : closed ? segN[segN.length - 1] : undefined;
+    let n1 = i < n - 1 ? segN[i] : closed ? segN[0] : undefined;
+    n0 = n0 ?? n1!;
+    n1 = n1 ?? n0;
+    let mx = n0.x + n1.x;
+    let my = n0.y + n1.y;
+    const ml = Math.hypot(mx, my);
+    if (ml < 1e-6) {
+      mx = n0.x;
+      my = n0.y;
+    } else {
+      mx /= ml;
+      my /= ml;
+    }
+    const cos = mx * n0.x + my * n0.y;
+    const s = o / Math.max(0.25, cos);
+    out.push({ x: pts[i]!.x + mx * s, y: pts[i]!.y + my * s });
+  }
+  return out;
+}

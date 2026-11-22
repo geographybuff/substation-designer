@@ -5,9 +5,11 @@
  *
  * URL parameters: preset=low|medium|high, design=showcase (every item kind
  * and rotation), grid=1, sel=ID,ID, live=1, focus=ITEM_ID (close-up camera),
- * look=x,y,z (orbit target), az=deg, el=deg, dist=m.
+ * look=x,y,z (orbit target), az=deg, el=deg, dist=m, scenario=/module.ts&v=name (a dev module exporting
+ * scenario(v) => { design, level }, e.g. tests/dev/scenarios.ts).
  */
 import { buildSceneModel } from '../engine/scene';
+import type { Design, LevelDef } from '../engine/types';
 import { SAMPLE_LEVEL, sampleDesign } from '../engine/samples';
 import { applyPreset, DEFAULT_GRAPHICS, type GraphicsSettings } from '../settings/graphics';
 import { createView3D, type SubstationView } from './index';
@@ -57,8 +59,11 @@ let live = params.get('live') === '1';
 let grid = params.get('grid') === '1';
 let selection = (params.get('sel') ?? '').split(',').filter(Boolean);
 const showcase = params.get('design') === 'showcase';
-const design = showcase ? showcaseDesign() : sampleDesign();
-const level = showcase ? SHOWCASE_LEVEL : SAMPLE_LEVEL;
+// scenario=/path/module.ts&v=name: a dev module exporting scenario(name) => { design, level }.
+const scenarioPath = params.get('scenario');
+const scenario = scenarioPath ? ((await import(/* @vite-ignore */ scenarioPath)) as { scenario: (v: string | null) => { design: Design; level: LevelDef } }).scenario(params.get('v')) : null;
+const design = scenario?.design ?? (showcase ? showcaseDesign() : sampleDesign());
+const level = scenario?.level ?? (showcase ? SHOWCASE_LEVEL : SAMPLE_LEVEL);
 const allIds = new Set([...design.items.map((i) => i.id), ...design.conductors.map((c) => c.id)]);
 const model = () => buildSceneModel(design, level, live ? (id) => allIds.has(id) : undefined);
 

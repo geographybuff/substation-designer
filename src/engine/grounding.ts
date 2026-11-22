@@ -155,8 +155,10 @@ export function checkGrounding(design: Design, level: LevelDef, g: GroundingResu
   if (gg.depthM < depth[0] - 1e-6 || gg.depthM > depth[1] + 1e-6) {
     out.push({ id: fid('ground.depth'), checkId: 'ground.depth', severity: 'minor', category: 'grounding', title: 'Unusual grid burial depth', detail: `Grid conductors are normally buried ${depth[0]}–${depth[1]} m below final grade.`, cite: [GROUNDING_RULES.burialDepthM.cite] });
   }
+  // Evaluator warnings that the checks around this loop already report in game terms.
+  const reportedHere = new Set(['unequal-spacing', 'depth-range', 'surface-thin', 'no-surface-layer']);
   for (const w of g.eval.warnings) {
-    if (w.code === 'unequal-spacing') continue;
+    if (reportedHere.has(w.code)) continue;
     out.push({ id: fid(`ground.${w.code}`), checkId: `ground.${w.code}`, severity: w.code === 'cs-out-of-chart' ? 'info' : 'minor', category: 'grounding', title: 'Ground grid design advice', detail: w.message, cite: [w.cite] });
   }
   const minT = GROUNDING_RULES.surfaceLayerMinThicknessM;
@@ -164,7 +166,16 @@ export function checkGrounding(design: Design, level: LevelDef, g: GroundingResu
     out.push({ id: fid('ground.surfacethin'), checkId: 'ground.surfacethin', severity: 'minor', category: 'grounding', title: 'Surface layer too thin', detail: `Cover the yard (and at least 1.0 m outside the fence) with at least ${minT.value * 100} cm (4 in) of crushed rock or equal of 3000 Ω·m or more.`, cite: [minT.cite] });
   }
   if (design.surfacing.material === 'none') {
-    out.push({ id: fid('ground.surface'), checkId: 'ground.surface', severity: 'info', category: 'grounding', title: 'No surface layer', detail: 'A layer of crushed rock greatly raises the tolerable touch and step voltages (reduction factor Cs, Table 9-4).', cite: [CITE.surface!] });
+    // Section 9.10.2 step 7 calls for the layer, so it costs the third star where the project offers surfacing.
+    out.push({
+      id: fid('ground.surface'),
+      checkId: 'ground.surface',
+      severity: level.features.surfacing ? 'minor' : 'info',
+      category: 'grounding',
+      title: 'No surface layer',
+      detail: `A layer of crushed rock greatly raises the tolerable touch and step voltages (reduction factor Cs, Table 9-4); section 9.10.2 calls for at least ${minT.value * 100} cm (4 in) of 3000 Ω·m or more.`,
+      cite: [CITE.surface!, minT.cite],
+    });
   }
   return out;
 }

@@ -5,7 +5,7 @@
 import { clearanceClassFor } from '../engine/site';
 import { busHeight, CATALOG } from '../engine/catalog';
 import { fenceRequiredDistance, gateSegment, removalPath } from '../engine/checks/physical';
-import { pointSegDist, samePoint, segments } from '../engine/geometry';
+import { offsetPolyline, pointSegDist, samePoint, segments } from '../engine/geometry';
 import { footprintOf, itemPorts, itemRect, type WorldPort } from '../engine/items';
 import { shieldingMap } from '../engine/lightning';
 import type { DesignReview } from '../engine/review';
@@ -563,15 +563,10 @@ export class PlanView {
     ctx.lineWidth = this.conductorWidth();
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'miter';
+    // Phase conductors with mitred corners (the same geometry as the 3D view).
     for (const off of [-s, 0, s]) {
       ctx.beginPath();
-      for (const [a, b] of segments(points)) {
-        const horiz = Math.abs(a.y - b.y) < 1e-9;
-        const ox = horiz ? 0 : off;
-        const oy = horiz ? off : 0;
-        ctx.moveTo(a.x + ox, a.y + oy);
-        ctx.lineTo(b.x + ox, b.y + oy);
-      }
+      offsetPolyline(points, false, off).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
       ctx.stroke();
     }
     // Animated flow dashes along the centre phase.

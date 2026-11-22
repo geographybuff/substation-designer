@@ -6,6 +6,55 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-22
+
+### Added
+- Campaign help: every finding and every unmet objective in the Review tab has a "Help me fix this"
+  link with plain-language steps in game terms, a small one-line diagram where it helps (feeder bay,
+  recloser and regulator bypass, transformer primary, arresters, straight terminal entry, taps,
+  mobile pad, sectionalized bus), a Field Guide link, and a Show me button that selects and frames
+  the equipment involved, pulses the right toolbox entry and turns on the relevant overlay.
+  Mechanical fixes offer a one-click button that can be undone: assigning a getaway to a free
+  feeder, lining equipment up with its bus, choosing a standard recloser rating or an adequate
+  interrupting rating, ticking the usual feeder and transformer relays, regulator arresters and
+  bypass switches, and installing the ground grid. Settings → Show tips turns this off.
+- Tutorials for projects 2-8 that walk through each project's new ideas (voltage regulation and
+  recloser bypass, shielding and arresters, mobile pad and removal routes, N-1 and the sectionalized
+  bus, the ground grid, the ring bus and line relaying, altitude corrections), each step with a
+  Show me button and a "Still needed" list.
+- New check: the phases of one bus need Table 4-7 metal-to-metal clearance from each other too, so a
+  jog or U-turn shorter than two phase spacings is flagged (critical).
+- New check: a bus that enters a terminal from the side squeezes the phase connections together; run
+  the bus straight out of the terminal (major).
+- Alignment guide: equipment placed or dragged within 0.75 m of the line of a terminal or bus in front
+  of it snaps into line, so buses run straight in.
+
+### Changed
+- First Light tutorial: the feeder-bay step now says there are two feeders, explains that a feeder is
+  the outgoing line ending at a Feeder Getaway, how to branch a bus, and lists what is still needed.
+- Plan view draws the three phase lines with mitred corners (the same geometry as the 3D view).
+
+### Fixed
+- 3D view: a bus junction looked different depending on the order its buses were drawn in. Runs are
+  now split where one ends on another, the straightest pair forms the main run, a second straight
+  pair passes beneath it with one riser per phase, and other branches tap in. Junctions at a corner no
+  longer put risers on the wrong phase or make buses appear to pass through each other, and bus
+  supports keep clear of junctions.
+- 3D view: jumpers from a bus to a terminal pair each phase with the nearest bushing instead of
+  crossing at random.
+- Objectives no longer show as met before there is anything to judge: on an empty design, or with
+  feeders, lines or the transformer not yet connected, they stay open with a note such as "connect
+  every feeder first". Shielding, arresters, clearances, the expansion area and removal routes need
+  the equipment (and fence) they are about.
+- A feeder getaway with no bus on its terminal is now flagged as not connected; before, placing
+  getaways anywhere satisfied "Serve the feeders".
+- Line protection no longer fails because of the minor distance-relay advice at 69 kV and above.
+- Only an energized station service transformer satisfies the AC auxiliary check, and only connected
+  capacitor banks count toward a kvar objective.
+- Ground grid findings are no longer reported twice (burial depth, thin surface layer). A missing
+  surface layer is one minor finding where the project offers surfacing (section 9.10.2 step 7)
+  instead of an info note plus a separate minor advice.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

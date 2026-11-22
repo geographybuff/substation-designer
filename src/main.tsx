@@ -11,6 +11,7 @@ render(<App />, document.getElementById('app')!);
 if (new URLSearchParams(window.location.search).has('e2e')) {
   (window as unknown as { __substationDesigner: unknown }).__substationDesigner = {
     store,
+    commit,
     go: (s: Screen) => go(s),
     async loadSolution(id: string): Promise<boolean> {
       const { SOLUTIONS } = await import('./levels/solutions');

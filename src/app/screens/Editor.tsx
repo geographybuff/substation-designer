@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { itemRect } from '../../engine/items';
 import { simulate } from '../../engine/simulation';
-import type { Finding } from '../../engine/types';
+import type { Finding, Vec2 } from '../../engine/types';
+import { helpForObjective, type Help } from '../../content/help';
+import type { HelpActions } from '../components/HelpPanel';
 import { EditorController } from '../../editor/controller';
-import { stepDone } from '../../levels/tutorial';
+import { stepDone, stepPending } from '../../levels/tutorial';
 import { Briefing } from '../components/Briefing';
 import { Inspector, money } from '../components/Inspector';
 import { ReviewPanel } from '../components/ReviewPanel';
@@ -32,6 +34,7 @@ export function Editor() {
   const showBriefing = useStore(store, (s) => s.showBriefing);
   const tutorialStep = useStore(store, (s) => s.tutorialStep);
   const graphics = useStore(store, (s) => s.graphics);
+  const game = useStore(store, (s) => s.game);
   const past = useStore(store, (s) => s.past.length);
   const future = useStore(store, (s) => s.future.length);
   const [tab, setTab] = useState<'inspect' | 'review'>('review');
@@ -51,9 +54,24 @@ export function Editor() {
     };
   }, [view, level?.id]);
 
+  // Selecting something opens the Inspector, except when "Show me" selects from the Review tab.
+  const keepTabRef = useRef(false);
   useEffect(() => {
+    if (keepTabRef.current) {
+      keepTabRef.current = false;
+      return;
+    }
     if (selection.length) setTab('inspect');
   }, [selection.join(',')]);
+
+  // Toolbox entry pulsed by "Show me" (cleared after a few seconds or when the tool changes).
+  const [helpTool, setHelpTool] = useState<{ tool: string; kv?: number } | null>(null);
+  useEffect(() => {
+    if (!helpTool) return undefined;
+    const t = setTimeout(() => setHelpTool(null), 9000);
+    return () => clearTimeout(t);
+  }, [helpTool]);
+  useEffect(() => setHelpTool(null), [tool]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,6 +89,7 @@ export function Editor() {
   const tut = level?.tutorial;
   const step = tut && tutorialStep < tut.length ? tut[tutorialStep] : null;
   const stepComplete = step && level && design ? (step.until ? stepDone(step.until, design, level, review) : false) : false;
+  const pending = step?.until && !stepComplete ? stepPending(step.until, review) : [];
   useEffect(() => {
     if (step?.until && stepComplete) {
       const t = setTimeout(() => store.set({ tutorialStep: store.get().tutorialStep + 1 }), 600);
@@ -98,6 +117,48 @@ export function Editor() {
     }
     if (at) ctrlRef.current?.focus(at);
   };
+
+  const centreOf = (id: string): Vec2 | undefined => {
+    const it = design.items.find((i) => i.id === id);
+    if (it) {
+      const r = itemRect(it);
+      return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+    }
+    const c = design.conductors.find((x) => x.id === id);
+    return c ? c.points[Math.floor(c.points.length / 2)] : undefined;
+  };
+
+  const helpActions: HelpActions | undefined =
+    !level.sandbox && game.showTips
+      ? {
+          showMe: (h: Help) => {
+            const toPlan = view === '3d';
+            if (toPlan) store.set({ view: '2d' });
+            if (h.overlay) store.set({ overlays: { ...store.get().overlays, [h.overlay]: true } });
+            const ids = (h.itemIds ?? []).filter((id) => design.items.some((i) => i.id === id) || design.conductors.some((c) => c.id === id));
+            if (ids.length) {
+              keepTabRef.current = true;
+              store.set({ selection: ids });
+              const at = centreOf(ids[0]!);
+              if (at) setTimeout(() => ctrlRef.current?.focus(at), toPlan ? 150 : 0);
+            }
+            if (h.tool) setTimeout(() => setHelpTool({ tool: h.tool!, kv: h.side === 'hv' ? level.system.hvKV : h.side === 'lv' ? level.system.lvKV : undefined }), 0);
+          },
+          fix: (h: Help) => {
+            const next = h.fix?.apply(design, level);
+            if (next) {
+              commit(next);
+              store.set({ toast: { text: 'Done. Press Ctrl+Z to undo.', tone: 'info', at: Date.now() } });
+            } else {
+              store.set({ toast: { text: 'That cannot be done automatically here; follow the steps instead.', tone: 'warn', at: Date.now() } });
+            }
+          },
+          guide: (topic: string) => store.set({ screen: 'guide', guideTopic: topic }),
+        }
+      : undefined;
+
+  const tutorialObjective = step?.objective && review ? review.objectives.find((o) => o.objective.kind === step.objective) : undefined;
+  const tutorialHelp = tutorialObjective && !stepComplete ? helpForObjective(tutorialObjective, { level, design, review: review! }) : null;
 
   const energize = () => {
     const r = runReviewNow();
@@ -151,7 +212,7 @@ export function Editor() {
           ⚡ Energize
         </button>
       </div>
-      <Toolbox level={level} highlight={step?.highlightTool} />
+      <Toolbox level={level} highlight={step?.highlightTool ?? helpTool?.tool} highlightKv={step?.highlightTool ? undefined : helpTool?.kv} />
       <div class="canvas-wrap">
         {view === '2d' ? <canvas ref={canvasRef} data-testid="plan-canvas" /> : <View3DHost design={design} level={level} graphics={graphics} />}
         {view === '2d' && (
@@ -201,6 +262,16 @@ export function Editor() {
             </div>
             <h4>{step.title}</h4>
             <p>{step.body}</p>
+            {pending.length > 0 && (
+              <div class="tutorial-pending" data-testid="tutorial-pending">
+                <div class="small muted">Still needed:</div>
+                <ul>
+                  {pending.slice(0, 4).map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '.5em', alignItems: 'center' }}>
               {step.until ? (
                 <span class="small" style={{ color: stepComplete ? 'var(--ok)' : 'var(--dim)' }}>
@@ -212,6 +283,11 @@ export function Editor() {
                 </button>
               )}
               <span style={{ flex: 1 }} />
+              {tutorialHelp && helpActions && (
+                <button class="btn small" onClick={() => helpActions.showMe(tutorialHelp)} data-testid="tutorial-show">
+                  Show me
+                </button>
+              )}
               {step.until && !stepComplete && (
                 <button class="btn small" onClick={() => store.set({ tutorialStep: tutorialStep + 1 })}>
                   Skip step
@@ -238,7 +314,7 @@ export function Editor() {
           {tab === 'inspect' ? (
             <Inspector design={design} level={level} review={review} selection={selection} />
           ) : (
-            <ReviewPanel review={review} level={level} design={design} stale={stale} onFocus={focusFinding} />
+            <ReviewPanel review={review} level={level} design={design} stale={stale} onFocus={focusFinding} helpActions={helpActions} />
           )}
         </div>
       </div>
