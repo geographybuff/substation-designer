@@ -1,6 +1,9 @@
 name: Release
 
-# Publishes a GitHub Release with Windows and web builds for every v* tag.
+# Publishes a GitHub Release with Windows and web builds for a v* tag.
+# Normally called by the Tag release workflow (tag-release.yml) with a tag and
+# a commit: the tag is created on that commit in the publish job, only after
+# every build has passed. Pushing a v* tag by hand also runs it.
 # Every release build requires license acceptance: the installer shows the
 # license page, and the game blocks play until the license is accepted. The
 # verify job fails the release if either safeguard is missing.
@@ -8,9 +11,23 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to create (if missing) and publish, e.g. v0.4.0
+        required: true
+        type: string
+      sha:
+        description: Commit to build and tag
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE_SHA: ${{ inputs.sha || github.sha }}
 
 jobs:
   verify:
@@ -21,6 +38,8 @@ jobs:
       version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -28,6 +47,8 @@ jobs:
       - run: npm ci
       - id: ver
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Tag matches package.json and CHANGELOG.md
+        run: node scripts/check-release.mjs "${RELEASE_TAG#v}"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -59,6 +80,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -89,6 +112,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -99,12 +124,27 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Release notes
-        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" artifacts/SHA256SUMS.txt > notes.md
+        run: node scripts/release-notes.mjs "${RELEASE_TAG#v}" artifacts/SHA256SUMS.txt > notes.md
+      - name: Create the tag if it is missing
+        run: |
+          if git fetch --depth=1 origin "+refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG" 2> /dev/null; then
+            tagged=$(git rev-parse "$RELEASE_TAG^{commit}")
+            if [ "$tagged" != "$RELEASE_SHA" ]; then
+              echo "::error::$RELEASE_TAG already exists on $tagged, not on $RELEASE_SHA"
+              exit 1
+            fi
+            echo "$RELEASE_TAG already exists on $RELEASE_SHA"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" "$RELEASE_SHA" -m "Substation Designer $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" artifacts/* \
-            --title "Substation Designer $GITHUB_REF_NAME" \
+          gh release create "$RELEASE_TAG" artifacts/* \
+            --title "Substation Designer $RELEASE_TAG" \
             --notes-file notes.md \
             --verify-tag

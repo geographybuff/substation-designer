@@ -51,7 +51,9 @@ npm run build:web    # single-file web build in dist-web/index.html
 npm run dist:win     # Windows installer, portable exe and zip in release/ (best on Windows)
 ```
 
-Releases are produced by GitHub Actions when a `vX.Y.Z` tag is pushed (see `.github/workflows/release.yml`).
+Releases are produced by GitHub Actions: the manually run *Tag release* workflow
+(`.github/workflows/tag-release.yml`) checks the version and changelog, builds and tests everything, tags
+`vX.Y.Z` and publishes the release (`.github/workflows/release.yml`; pushing a `v*` tag also runs it).
 The release job fails unless license acceptance is enforced in both the installer and the game.
 
 ## Accuracy and sources
