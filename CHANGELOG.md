@@ -14,8 +14,10 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
   recloser and regulator bypass, transformer primary, arresters, straight terminal entry, taps,
   mobile pad, sectionalized bus), a Field Guide link, and a Show me button that selects and frames
   the equipment involved, pulses the right toolbox entry and turns on the relevant overlay.
-  Mechanical fixes (such as assigning a getaway to a free feeder or lining equipment up with its bus)
-  offer a one-click "Do it for me" that can be undone. Settings → Show tips turns this off.
+  Mechanical fixes offer a one-click button that can be undone: assigning a getaway to a free
+  feeder, lining equipment up with its bus, choosing a standard recloser rating or an adequate
+  interrupting rating, ticking the usual feeder and transformer relays, regulator arresters and
+  bypass switches, and installing the ground grid. Settings → Show tips turns this off.
 - Tutorials for projects 2-8 that walk through each project's new ideas (voltage regulation and
   recloser bypass, shielding and arresters, mobile pad and removal routes, N-1 and the sectionalized
   bus, the ground grid, the ring bus and line relaying, altitude corrections), each step with a

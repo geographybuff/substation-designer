@@ -405,7 +405,7 @@ export const L6_TOUCH_AND_STEP: LevelDef = {
   ],
   tutorial: [
     { id: 't1', title: 'What is new here', body: 'A ground fault drives current into the earth and raises the voltage of everything in the yard. The ground grid must keep touch and step voltages below what a person can tolerate (Chapter 9). Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
-    { id: 't2', title: 'Design the ground grid', body: 'Click empty ground so nothing is selected: the Inspector shows the Site settings. Tick "Install grid", then adjust spacing, rods and surfacing until the Review panel shows the grid as safe. Turn on the Grounding overlay to see it.', until: 'objective:grounding_safe', objective: 'grounding_safe' },
+    { id: 't2', title: 'Design the ground grid', body: 'Click empty ground so nothing is selected: the Inspector shows the Site settings. Tick "Install grid", then adjust spacing, rods and surfacing until the Review panel shows the grid as safe. Turn on the Ground grid overlay to see it.', until: 'objective:grounding_safe', objective: 'grounding_safe' },
     { id: 't3', title: 'Finish up', body: 'Protect the transformer and feeders, regulate voltage and fence the yard as before. Bond the fence to the grid and run the grid past the fence line.' },
   ],
 };
