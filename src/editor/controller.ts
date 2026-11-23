@@ -2,6 +2,7 @@
  * Editor input controller: translates pointer and keyboard input on the plan
  * canvas into design operations, and keeps the PlanView's state up to date.
  */
+import { sfx } from '../audio/player';
 import { CATALOG } from '../engine/catalog';
 import {
   addConductor,
@@ -230,6 +231,7 @@ export class EditorController {
         if (!this.shieldFrom) this.shieldFrom = it.id;
         else {
           commit(addShieldWire(design, this.shieldFrom, it.id));
+          sfx.ui('bus', 0);
           this.shieldFrom = null;
         }
         this.push();
@@ -239,15 +241,20 @@ export class EditorController {
         const id = this.view.itemAt(wp);
         if (id) {
           commit(deleteItems(design, [id]));
+          sfx.ui('erase');
           return;
         }
         const cid = this.view.conductorAt(wp);
         if (cid) {
           commit(deleteConductors(design, [cid]));
+          sfx.ui('erase');
           return;
         }
         const sw = this.view.shieldWireAt(wp);
-        if (sw) commit(deleteShieldWire(design, sw));
+        if (sw) {
+          commit(deleteShieldWire(design, sw));
+          sfx.ui('erase');
+        }
         return;
       }
     }
@@ -317,6 +324,7 @@ export class EditorController {
         const len = side === 'N' || side === 'S' ? r.w : r.h;
         const width = Math.min(6, Math.max(3, len - 2));
         commit(setFence(base, { rect: r, gate: { side, offset: snap((len - width) / 2), width } }));
+        sfx.ui('fence');
         store.set({ tool: { kind: 'select' } });
       }
     }
@@ -457,6 +465,7 @@ export class EditorController {
     const blocked = placementBlocked(design, level, rect);
     if (blocked) {
       store.set({ toast: { text: blocked, tone: 'warn', at: Date.now() } });
+      sfx.ui('blocked');
       return;
     }
     const it = makeItem(design, kind, x, y, this.ghostRot, s.tool.kv, props);
@@ -467,6 +476,7 @@ export class EditorController {
       if (free) it.props.feeder = free.name;
     }
     commit(addItem(design, it));
+    sfx.placed(it);
     store.set({ selection: [it.id], ...(keepTool ? {} : {}) });
   }
 
@@ -534,7 +544,10 @@ export class EditorController {
     const d = this.busDraft;
     this.busDraft = null;
     const design = store.get().design;
-    if (d && design && d.points.length >= 2) commit(addConductor(design, d.points, d.kv, d.elevation));
+    if (d && design && d.points.length >= 2) {
+      commit(addConductor(design, d.points, d.kv, d.elevation));
+      sfx.ui('bus', d.kv);
+    }
     this.push();
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { sfx } from '../../audio/player';
 import { itemRect } from '../../engine/items';
 import { simulate } from '../../engine/simulation';
 import type { Finding, Vec2 } from '../../engine/types';
@@ -169,8 +170,9 @@ export function Editor() {
       if (!ok) return;
     }
     const sim = simulate(design, level, r, (Date.now() & 0xffff) + 1);
+    const { fault } = sfx.energize(design, level, r);
     if (r.passed) recordProgress(level.id, r.stars, r.score, true);
-    store.set({ lastResult: { review: r, levelId: level.id, sim }, screen: 'results' });
+    store.set({ lastResult: { review: r, levelId: level.id, sim, fault }, screen: 'results' });
   };
 
   const toggle = (k: keyof typeof overlays) => store.set({ overlays: { ...overlays, [k]: !overlays[k] } });

@@ -32,6 +32,18 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.addInitScript(() => localStorage.setItem('substation-designer:license', JSON.stringify({ hash: 'pending', acceptedAt: '' })));
+  // Count sounds started, so the test can see that placing equipment plays its sound.
+  await page.addInitScript(() => {
+    window.__soundsStarted = 0;
+    const proto = window.AudioBufferSourceNode?.prototype;
+    if (proto) {
+      const start = proto.start;
+      proto.start = function (...a) {
+        window.__soundsStarted++;
+        return start.apply(this, a);
+      };
+    }
+  });
   await page.goto(`http://127.0.0.1:${server.address().port}/?e2e=1`);
   // Accept the license properly through the UI.
   await page.waitForSelector('[data-testid=license-gate]');
@@ -54,6 +66,10 @@ try {
   };
   const design = () => page.evaluate(() => window.__substationDesigner.store.get().design);
 
+  // The primary-switch step pulses only the 69 kV Disconnect Switch, not the 12.47 kV one.
+  if (!(await page.$('[data-testid="tool-switch-69"].pulse'))) fail('the 69 kV switch is not highlighted');
+  if (await page.$('[data-testid="tool-switch-12.47"].pulse')) fail('the 12.47 kV switch is highlighted too');
+
   // Place a 69 kV disconnect switch with its top-left at (5, 15.5): cursor at the footprint centre.
   await page.click('[data-testid="tool-switch-69"]');
   let p = await at(6.25, 18);
@@ -62,6 +78,7 @@ try {
   let d = await design();
   const sw = d.items.find((i) => i.kind === 'switch');
   if (!sw || sw.x !== 5 || sw.y !== 15.5) fail(`switch not placed where expected: ${JSON.stringify(sw)}`);
+  if (!(await page.evaluate(() => window.__soundsStarted))) fail('placing the switch played no sound');
 
   // Draw a 69 kV bus from the line terminal port (2.5, 18) to the switch port (5, 18).
   await page.click('[data-testid="tool-bus-69"]');

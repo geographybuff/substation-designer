@@ -6,6 +6,24 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+### Added
+- Sound. Each piece of equipment plays about two seconds of its normal operating sound as you place
+  it: transformers and regulators hum at 120 Hz (twice the 60 Hz system frequency) with harmonics,
+  louder for bigger transformers and with fan noise when forced-air cooled; regulators change tap;
+  breakers charge their spring and close; reclosers clack; disconnect switches swing shut; buses,
+  fences and erasing have their own short sounds.
+- Energizing a design you can hear: a sound design closes in switch by switch and the transformer
+  hums up. Energizing one with critical findings turns its worst physical failure into an arcing
+  fault at that circuit's own voltage and fault current: equipment or bus rated below the bus voltage
+  flashes over, too-small clearances flash over between phases or to ground, a device that cannot
+  interrupt the fault fails, and an unprotected transformer faults internally. The arc pulses at
+  every current zero and lasts as long as the device that would really clear it takes: power fuses
+  blow in about two cycles, a recloser trips, recloses onto the fault and trips again, a breaker
+  trips in about seven cycles, and with nothing in the station the arc burns until the far end of
+  the line trips (and the transformer tank ruptures). The Results screen says what you heard and can
+  replay it.
+- Settings → Audio: sound on or off, and volume.
+
 ### Changed
 - Tutorial: a step that asks for one voltage now highlights only that toolbox entry (First Light's
   primary disconnect switch pulses the 69 kV entry, not the 12.47 kV one).

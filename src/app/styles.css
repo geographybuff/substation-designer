@@ -155,6 +155,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 .tutorial h4 { margin: 0 0 .35em; color: var(--accent); }
 .tutorial p { margin: 0 0 .6em; font-size: .9em; }
 .tutorial-pending { margin: 0 0 .6em; }
+.fault-caption { margin-top: .5em; max-width: 640px; font-size: .9em; color: var(--major); }
 .tutorial { max-height: calc(100% - 100px); overflow-y: auto; }
 .tutorial .help-diagram svg { max-width: 260px; }
 .tutorial .help-diagram figcaption { display: none; }

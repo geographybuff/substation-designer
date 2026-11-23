@@ -33,6 +33,10 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
   `ReviewPanel` and the tutorial card; `Editor.tsx` implements Show me (select + frame, pulse the toolbox entry,
   overlay). Gated by Settings → Show tips; not shown in the sandbox. `tests/help.test.ts` asserts coverage.
   Every campaign level has a tutorial; steps can wait on `objective:<kind>` (see `levels/tutorial.ts`).
+- **Bus supports** (unreleased): `planSupports` in `render3d/conductors.ts` (pure, tested over every solution):
+  a support just behind every bus end at a device terminal (two such on a bus up to ~3 m merge into one
+  mid-way), mirrored supports at `junctionClearance(otherSp)` on both sides of every junction on the upper and
+  the lower run, corners and free ends, then spans filled to ≤ 6 m outside junction keep-outs.
 - **Bus geometry** (0.4.0): phase lines use `offsetPolyline` (engine/geometry) in plan and 3D. 3D junctions
   (`render3d/conductors.ts`): runs are split where another run ends on them, the straightest pair at a junction
   is the main run, a second straight pair crosses beneath with one riser per phase, other branches tap; levels
@@ -40,6 +44,15 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
   folding at a jog < 2 × phase spacing) and `conn.sideentry` (bus entering a terminal from the side);
   `alignPlacement` snaps equipment into line while placing/dragging, `alignItemToBus` is the one-click fix.
   Dev: `view3d-harness.html?scenario=/tests/dev/scenarios.ts&v=<name>` renders junction variants or `sol:<levelId>`.
+- **Audio** (unreleased): `src/audio/`. `dsp.ts` (pure DSP: seeded noise, biquads, envelopes, Goertzel for tests),
+  `sounds.ts` (synthesized sounds rendered to Float32Array: equipment voices, editor sounds, `renderArc` with
+  120 Hz pulsing, arc power from Table 4-7 gap × fault kA, duration from the clearing device, `renderEnergize`),
+  `faults.ts` (which critical finding becomes an arc, at which node voltage and fault kA, cleared by which
+  device: the most selective protective device whose opening de-energizes the node), `player.ts` (Web Audio,
+  cached AudioBuffers, `sfx.placed/ui/energize`, settings via `configureAudio`), `samples.ts` (optional
+  recorded samples in `assets/audio/`, inlined by `import.meta.glob`; licences enforced by
+  `tests/audio.test.ts`; sourcing notes in `assets/audio/README.md`). No samples are committed yet: the
+  sound libraries' bot policies rule out automated downloads, so samples are added by hand.
 - **Desktop/release**: `electron/main.cjs` + `preload.cjs`, `electron-builder.yml` (NSIS with license page,
   portable, zip), `scripts/` (icon, prepare-build, verify-release, release-notes), `.github/workflows/`
   (`ci.yml`; `tag-release.yml`, run by hand, which calls `release.yml`; `release.yml` also runs on a pushed `v*` tag).

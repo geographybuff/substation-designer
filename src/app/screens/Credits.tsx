@@ -1,3 +1,4 @@
+import { AUDIO_CREDITS } from '../../audio/samples';
 import { LICENSE_NAME, LICENSE_TEXT } from '../license';
 import { go } from '../store';
 
@@ -30,6 +31,23 @@ export function Credits() {
             The bulletin reproduces some tables and figures with permission from IEEE, NEMA, ANSI and others. The game uses factual values and paraphrased guidance with
             citations rather than reproducing those materials.
           </p>
+        </div>
+        <div class="card" style={{ marginBottom: '1em' }} data-testid="audio-credits">
+          <h3>Sound</h3>
+          <p class="muted">
+            Equipment hum, switchgear and arcing faults are synthesized in the game from the physics of each sound: transformer hum at twice the 60 Hz system
+            frequency, arcs that pulse at every current zero and last as long as the protective device takes to clear them.
+          </p>
+          {AUDIO_CREDITS.length > 0 && (
+            <ul class="small">
+              {AUDIO_CREDITS.map((c) => (
+                <li key={c.file}>
+                  “{c.title}” by {c.author} ({c.source}), {c.license}
+                  {c.modified ? `; ${c.modified}` : ''}. Not covered by the game's license.
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div class="card">
           <h3>{LICENSE_NAME}</h3>
