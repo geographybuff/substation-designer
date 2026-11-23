@@ -3,6 +3,7 @@
  * +y south (down on screen), heights (z) in metres above finished grade.
  */
 import type { Citation } from '../data/bulletin/types';
+import type { HelpDiagramId } from '../content/help';
 
 export interface Vec2 {
   x: number;
@@ -233,6 +234,13 @@ export interface TutorialStep {
   until?: string;
   /** Item kind to highlight in the toolbox. */
   highlightTool?: string;
+  /**
+   * Which voltage's entry to highlight when the tool comes at both of the level's voltages
+   * (required then; tests/tutorial.test.ts checks it). 'both' pulses every entry.
+   */
+  highlightSide?: 'hv' | 'lv' | 'both';
+  /** One-line diagram shown in the tutorial card (see HelpDiagram.tsx). */
+  diagram?: HelpDiagramId;
   /** Objective this step teaches: the tutorial card offers its "Show me" help. */
   objective?: ObjectiveKind;
 }

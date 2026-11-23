@@ -81,6 +81,7 @@ export const L1_FIRST_LIGHT: LevelDef = {
       body: 'Every distribution substation starts with a primary disconnect switch that isolates the station from the line for maintenance. Pick "Disconnect Switch" in the toolbox (69 kV) and place it east of the line terminal. Press R to rotate before placing.',
       until: 'has_hv_switch',
       highlightTool: 'switch',
+      highlightSide: 'hv',
     },
     {
       id: 't3',
@@ -88,6 +89,7 @@ export const L1_FIRST_LIGHT: LevelDef = {
       body: 'Power fuses on the transformer primary clear transformer and low-voltage bus faults (§4.3.2). Place a set of 69 kV Power Fuses next to the switch.',
       until: 'has_fuse',
       highlightTool: 'fuse',
+      highlightSide: 'hv',
     },
     {
       id: 't4',
@@ -102,6 +104,7 @@ export const L1_FIRST_LIGHT: LevelDef = {
       body: 'Choose the Bus tool (B) at 69 kV. Click a terminal dot, click again to add corners, and finish on another terminal. Connect line → switch → fuses → transformer HV.',
       until: 'hv_connected',
       highlightTool: 'bus',
+      highlightSide: 'hv',
     },
     {
       id: 't6',
@@ -109,6 +112,7 @@ export const L1_FIRST_LIGHT: LevelDef = {
       body: 'A feeder is a 12.47 kV distribution line leaving the station toward members. It is not a part you place: in the toolbox it ends at a "Feeder Getaway". This station serves two feeders, Elm Grove and Mill Road, so build two bays. First draw a 12.47 kV bus from the transformer LV terminal. Each bay is disconnect switch → recloser → disconnect switch → Feeder Getaway, joined with 12.47 kV bus. For the second bay, start a new bus by clicking on an existing 12.47 kV bus to branch it. Finally, select each getaway and set its Feeder field in the inspector.',
       until: 'feeders_protected',
       highlightTool: 'recloser',
+      diagram: 'feeder-bay',
     },
     {
       id: 't7',
@@ -178,8 +182,8 @@ export const L2_KEEP_LIGHTS_ON: LevelDef = {
   reliabilityTarget: 230,
   tutorial: [
     { id: 't1', title: 'What is new here', body: 'Cottonwood Valley\'s long feeders sag in voltage on hot afternoons, and its crews must maintain reclosers without dropping members. Build the station as in First Light, now with three feeder bays, then add voltage regulation and recloser bypasses. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
-    { id: 't2', title: 'Regulate the voltage', body: 'Place Voltage Regulators either once on the 12.47 kV bus right after the transformer (bus regulation) or in every feeder bay (feeder regulation, Fig. 4-3). A transformer with "Load tap changer (LTC)" ticked in the Inspector also regulates the bus.', until: 'objective:voltage_regulation', highlightTool: 'regulator', objective: 'voltage_regulation' },
-    { id: 't3', title: 'Bypass each recloser', body: 'For every feeder bay, add Hook Stick Switches with "Normally open" ticked, connected from the station bus to the feeder side of the bay (Fig. 4-4). Closing it lets a crew open the recloser and its two disconnect switches while the feeder stays energized.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers' },
+    { id: 't2', title: 'Regulate the voltage', body: 'Pick one of three ways (Fig. 4-3). Bus regulation: place Voltage Regulators right after the transformer, connected to its 12.47 kV terminal, and start the station bus on their far side. Feeder regulation: one regulator bank in every feeder bay. Or select the transformer and tick "Load tap changer (LTC)" in the Inspector. This step is done as soon as bus regulators are connected to the transformer, the LTC is ticked, or every feeder has its own regulator.', until: 'regulation_placed', highlightTool: 'regulator', objective: 'voltage_regulation', diagram: 'bus-regulation' },
+    { id: 't3', title: 'Bypass each recloser', body: 'A bypass lets a crew work on a recloser while its feeder stays on (Fig. 4-4). It runs alongside the bay, not in it: keep each bay as disconnect switch → recloser → disconnect switch → Feeder Getaway, and add a Hook Stick Switch from the station bus to the bus between the last disconnect switch and the getaway. Tick "Normally open" on it in the Inspector. This step is done when every feeder recloser has one.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers', diagram: 'recloser-bypass' },
     { id: 't4', title: 'Finish up', body: 'Optional: regulators can be bypassed too. Keep "Bypass switches" ticked in each regulator\'s Inspector. Then fence the yard, clear the critical findings and press Energize.' },
   ],
 };
@@ -239,7 +243,7 @@ export const L3_THUNDERSTORM_ALLEY: LevelDef = {
   tutorial: [
     { id: 't1', title: 'What is new here', body: 'This site sees about 70 thunderstorm days a year. The station needs direct-stroke shielding over everything energized and surge arresters at the transformer and line entrance. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
     { id: 't2', title: 'Shield the yard', body: 'Place Lightning Masts around the equipment and turn on the Shielding overlay: every energized part must sit inside the protected zone (fixed-angle method, 30° and 45°, Fig. 4-17). Raise a mast in the Inspector to widen its zone; shield wires between masts cover long spans.', until: 'objective:shielding', highlightTool: 'mast', objective: 'shielding' },
-    { id: 't3', title: 'Surge arresters', body: 'Place Surge Arrester Stands at the transformer high-voltage and low-voltage terminals and at the incoming line, and connect each to the bus right at that terminal (section 4.3.5). Arresters protect only what is close to them.', until: 'objective:arresters', highlightTool: 'arrester', objective: 'arresters' },
+    { id: 't3', title: 'Surge arresters', body: 'Place Surge Arrester Stands at the transformer high-voltage and low-voltage terminals and at the incoming line, and connect each to the bus right at that terminal (section 4.3.5). Arresters protect only what is close to them.', until: 'objective:arresters', highlightTool: 'arrester', highlightSide: 'both', objective: 'arresters' },
     { id: 't4', title: 'Finish up', body: 'Regulate feeder voltage and fence the yard as in the earlier projects. Recloser bypasses are optional here but earn the third star.' },
   ],
 };
@@ -301,7 +305,7 @@ export const L4_MOBILE_READY: LevelDef = {
     { id: 't1', title: 'What is new here', body: 'This cooperative keeps a mobile transformer for emergencies, so the station needs a pad where it can be connected to carry every feeder, and a clear route to drive the station transformer out. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
     { id: 't2', title: 'Mobile transformer pad', body: 'Place a Mobile Unit Connection Pad. Connect its high-voltage side to the 69 kV bus and its low-voltage side to the 12.47 kV bus, each through a Disconnect Switch with "Normally open" ticked, so a mobile unit parked there can feed every feeder while the station transformer is out.', until: 'objective:mobile_provision', highlightTool: 'mobile_pad', objective: 'mobile_provision' },
     { id: 't3', title: 'Removal route', body: 'Turn on the Removal overlay. The transformer needs a path to the gate wide enough for it. Low buses block that path: leave a gap, or draw the bus across the route with the High bus tool.', until: 'objective:removal_path', objective: 'removal_path' },
-    { id: 't4', title: 'Bypass the reclosers', body: 'As in Keep the Lights On, give every recloser a normally-open bypass switch.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers' },
+    { id: 't4', title: 'Bypass the reclosers', body: 'As in Keep the Lights On, give every recloser a bypass: a Hook Stick Switch with "Normally open" ticked, from the station bus to the bus between the bay\'s last disconnect switch and its getaway.', until: 'objective:bypass_reclosers', highlightTool: 'hookstick_switch', objective: 'bypass_reclosers', diagram: 'recloser-bypass' },
   ],
 };
 
@@ -366,7 +370,7 @@ export const L5_GROWING_PAINS: LevelDef = {
   tutorial: [
     { id: 't1', title: 'What is new here', body: 'Growing load needs two transformers, a 12.47 kV bus split into two sections with a tie breaker, and room for a future bay. Every unmet objective and every finding in the Review tab has a "Help me fix this" link with steps, a diagram where it helps, and a Show me button that points at the right equipment and toolbox entry.' },
     { id: 't2', title: 'Either transformer carries the load', body: 'Size both transformers so either one alone can carry today\'s peak with the other out of service (N-1). The Review panel shows today\'s peak; check each transformer\'s top rating in the Inspector.', until: 'objective:n_minus_1_transformer', highlightTool: 'transformer', objective: 'n_minus_1_transformer' },
-    { id: 't3', title: 'Sectionalized bus', body: 'Build two 12.47 kV bus sections, one per transformer, and join them with a Power Circuit Breaker set "Normally open (tie)" in the Inspector (section 4.6.2). Split the feeders between the sections.', until: 'objective:switching_scheme', highlightTool: 'breaker', objective: 'switching_scheme' },
+    { id: 't3', title: 'Sectionalized bus', body: 'Build two 12.47 kV bus sections, one per transformer, and join them with a Power Circuit Breaker set "Normally open (tie)" in the Inspector (section 4.6.2). Split the feeders between the sections.', until: 'objective:switching_scheme', highlightTool: 'breaker', highlightSide: 'lv', objective: 'switching_scheme' },
     { id: 't4', title: 'Leave room to grow', body: 'Keep the marked future bay area inside the fence and free of equipment and bus.', until: 'objective:expansion_area', objective: 'expansion_area' },
   ],
 };

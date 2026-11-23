@@ -6,6 +6,24 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+### Changed
+- Tutorial: a step that asks for one voltage now highlights only that toolbox entry (First Light's
+  primary disconnect switch pulses the 69 kV entry, not the 12.47 kV one).
+- Keep the Lights On tutorial: the voltage regulation step finishes as soon as bus regulators are
+  connected to the transformer's low-voltage terminal (or the transformer has a load tap changer),
+  without waiting for the feeder bays. It shows a one-line diagram of bus regulation.
+- Recloser bypass steps (Keep the Lights On, Mobile Ready) explain that the bypass runs alongside
+  the bay, show the bypass diagram, and list what is still missing bay by bay: feeders without a
+  recloser, hook stick switches wired in series with a feeder or left closed, and reclosers with no
+  bypass yet.
+
+### Fixed
+- 3D view: every rigid bus now stands on bus supports. Short buses between two pieces of equipment
+  (such as transformer to regulator) no longer float in mid-air; a bus that ends at equipment has a
+  support just behind its end, with the flexible jumpers hanging from there.
+- 3D view: where buses meet, the supports stand the same distance either side of the junction, on
+  the upper bus and on the bus that taps or crosses beneath it, clear of the other bus's phases.
+
 ## [0.4.0] - 2026-11-22
 
 ### Added

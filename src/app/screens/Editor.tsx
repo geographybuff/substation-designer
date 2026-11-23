@@ -7,6 +7,7 @@ import type { HelpActions } from '../components/HelpPanel';
 import { EditorController } from '../../editor/controller';
 import { stepDone, stepPending } from '../../levels/tutorial';
 import { Briefing } from '../components/Briefing';
+import { HelpDiagram } from '../components/HelpDiagram';
 import { Inspector, money } from '../components/Inspector';
 import { ReviewPanel } from '../components/ReviewPanel';
 import { Toolbox } from '../components/Toolbox';
@@ -89,7 +90,7 @@ export function Editor() {
   const tut = level?.tutorial;
   const step = tut && tutorialStep < tut.length ? tut[tutorialStep] : null;
   const stepComplete = step && level && design ? (step.until ? stepDone(step.until, design, level, review) : false) : false;
-  const pending = step?.until && !stepComplete ? stepPending(step.until, review) : [];
+  const pending = step?.until && !stepComplete && level && design ? stepPending(step.until, design, level, review) : [];
   useEffect(() => {
     if (step?.until && stepComplete) {
       const t = setTimeout(() => store.set({ tutorialStep: store.get().tutorialStep + 1 }), 600);
@@ -212,7 +213,11 @@ export function Editor() {
           ⚡ Energize
         </button>
       </div>
-      <Toolbox level={level} highlight={step?.highlightTool ?? helpTool?.tool} highlightKv={step?.highlightTool ? undefined : helpTool?.kv} />
+      <Toolbox
+        level={level}
+        highlight={step?.highlightTool ?? helpTool?.tool}
+        highlightKv={step?.highlightTool ? (step.highlightSide === 'hv' ? level.system.hvKV : step.highlightSide === 'lv' ? level.system.lvKV : undefined) : helpTool?.kv}
+      />
       <div class="canvas-wrap">
         {view === '2d' ? <canvas ref={canvasRef} data-testid="plan-canvas" /> : <View3DHost design={design} level={level} graphics={graphics} />}
         {view === '2d' && (
@@ -262,6 +267,7 @@ export function Editor() {
             </div>
             <h4>{step.title}</h4>
             <p>{step.body}</p>
+            {step.diagram && !stepComplete && <HelpDiagram id={step.diagram} />}
             {pending.length > 0 && (
               <div class="tutorial-pending" data-testid="tutorial-pending">
                 <div class="small muted">Still needed:</div>

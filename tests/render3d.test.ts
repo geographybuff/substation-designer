@@ -9,7 +9,11 @@ import type { PlacedItem, Rotation } from '../src/engine/types';
 import { applyPreset, DEFAULT_GRAPHICS, PRESETS } from '../src/settings/graphics';
 import { buildScene } from '../src/render3d/build';
 import { needsNewRenderer, renderConfig, sceneKey, type RenderConfig } from '../src/render3d/config';
-import { buildChains, offsetPolyline, type PortRef } from '../src/render3d/conductors';
+import { buildChains, junctionClearance, junctionZones, MIN_GAP, offsetPolyline, planSupports, PORT_INSET, type Chain, type PortRef } from '../src/render3d/conductors';
+import { CAMPAIGN } from '../src/levels';
+import { SOLUTIONS } from '../src/levels/solutions';
+import { setSiteAltitude } from '../src/engine/site';
+import { scenario } from './dev/scenarios';
 import { itemMatrix, localDirToPlan, localToPlan } from '../src/render3d/coords';
 import { ResourceLibrary } from '../src/render3d/library';
 import { SHOWCASE_LEVEL, showcaseDesign } from '../src/render3d/showcase';
@@ -182,6 +186,83 @@ describe('conductors', () => {
     expect(shape(layouts.horizontalThrough)).toEqual(ref);
     expect(shape(layouts.cornerAndTaps)).toEqual(ref);
   });
+});
+
+describe('bus supports', () => {
+  const portsOf = (model: ReturnType<typeof buildSceneModel>): PortRef[] =>
+    model.items.flatMap((it) => footprintOf(it).ports.map((p) => ({ itemId: it.id, portId: p.id, pos: localToPlan(it, p.local.x, p.local.y), dir: localDirToPlan(it.rot, p.dir.x, p.dir.y), terminals: null })));
+  const c = (id: string, ...pts: Array<[number, number]>) => ({ id, points: pts.map(([x, y]) => ({ x, y })), height: 4, phaseSpacing: 0.6, kv: 12.47, elevation: 'low' as const, energized: false });
+  const runLen = (ch: Chain) => ch.pts.reduce((l, p, i) => (i ? l + Math.hypot(p.x - ch.pts[i - 1]!.x, p.y - ch.pts[i - 1]!.y) : 0), 0);
+
+  it('frame a four-way junction symmetrically on the run above and the run beneath', () => {
+    const chains = buildChains({ conductors: [c('V', [10, 0], [10, 20]), c('W', [4, 10], [10, 10]), c('E', [10, 10], [17, 10])] }, []);
+    const sup = planSupports(chains);
+    const d = junctionClearance(0.6);
+    for (const [idx, ch] of chains.entries()) {
+      const pts = sup.filter((s) => s.chain === idx).map((s) => s.pts3[1]!);
+      const dists = pts.map((p) => Math.hypot(p.x - 10, p.y - 10));
+      const near = dists.filter((x) => x < d + 0.5).sort((a, b) => a - b);
+      expect(near, `run ${ch.owners.join('+')}`).toHaveLength(2);
+      expect(near[0]).toBeCloseTo(d, 6);
+      expect(near[1]).toBeCloseTo(d, 6);
+      // One on each side of the junction.
+      const sides = pts.filter((_, i) => dists[i]! < d + 0.5).map((p) => Math.sign(p.x - 10 + p.y - 10));
+      expect(new Set(sides).size).toBe(2);
+    }
+  });
+
+  it('never leave a bus between two pieces of equipment floating, however short', () => {
+    const ports: PortRef[] = [
+      { itemId: 'T1', portId: 'lv', pos: { x: 20, y: 21 }, dir: { x: 1, y: 0 }, terminals: null },
+      { itemId: 'RG1', portId: 'a', pos: { x: 22, y: 21 }, dir: { x: -1, y: 0 }, terminals: null },
+    ];
+    const chains = buildChains({ conductors: [c('L1', [20, 21], [22, 21])] }, ports);
+    expect([chains[0]!.start.t, chains[0]!.end.t]).toEqual(['port', 'port']);
+    const sup = planSupports(chains);
+    expect(sup.length).toBeGreaterThanOrEqual(1);
+    // A longer one gets a support just behind each terminal.
+    const ports2 = [ports[0]!, { ...ports[1]!, pos: { x: 25, y: 21 } }];
+    const sup2 = planSupports(buildChains({ conductors: [c('L1', [20, 21], [25, 21])] }, ports2)).map((s) => s.pts3[1]!.x).sort((a, b) => a - b);
+    expect(sup2[0]).toBeCloseTo(20 + PORT_INSET, 6);
+    expect(sup2[sup2.length - 1]).toBeCloseTo(25 - PORT_INSET, 6);
+  });
+
+  const designs: Array<[string, () => { design: Parameters<typeof buildSceneModel>[0]; level: Parameters<typeof buildSceneModel>[1] }]> = [
+    ...CAMPAIGN.map((l) => [`solution ${l.id}`, () => (setSiteAltitude(l.site.altitudeM), { design: SOLUTIONS[l.id]!(), level: l })] as [string, () => never]),
+    ...['vthrough', 'hthrough', 'corner', 'sideentry'].map((v) => [`scenario ${v}`, () => scenario(v)] as [string, () => never]),
+    ['sample design', () => ({ design: sampleDesign(), level: SAMPLE_LEVEL })],
+  ];
+  for (const [name, make] of designs) {
+    it(`hold up every bus run in the ${name}`, () => {
+      const { design, level } = make();
+      const model = buildSceneModel(design, level);
+      const chains = buildChains(model, portsOf(model));
+      const sup = planSupports(chains);
+      const zones = junctionZones(chains);
+      chains.forEach((ch, idx) => {
+        const mine = sup.filter((s) => s.chain === idx).map((s) => s.s).sort((a, b) => a - b);
+        const L = runLen(ch);
+        const label = `${ch.owners.join('+')} (${L.toFixed(1)} m)`;
+        const blocked = (s: number) => zones[idx]!.all.some((k) => Math.abs(s - k.s) < k.d);
+        // Only a short link between two other runs may rely on its risers alone.
+        if (!(ch.start.t === 'tee' && ch.end.t === 'tee')) expect(mine.length, label).toBeGreaterThan(0);
+        // No span over 6 m, unless junction clearances leave nowhere in it for a post to stand.
+        for (let i = 0; i + 1 < mine.length; i++) {
+          if (mine[i + 1]! - mine[i]! <= 6 + 1e-6) continue;
+          for (let s = mine[i]! + 0.5; s < mine[i + 1]! - 0.5; s += 0.1) expect(blocked(s), `${label}: span ${mine[i]!.toFixed(2)}–${mine[i + 1]!.toFixed(2)} could take a post at ${s.toFixed(2)}`).toBe(true);
+        }
+        // A bus ending at equipment has a post just behind that end (or one post mid-way on a bus of up to
+        // 3 m between two devices, or a junction post within MIN_GAP), unless a junction there leaves no room.
+        const reach = ch.start.t === 'port' && ch.end.t === 'port' && L <= 3 + 1e-6 ? L / 2 + 1e-6 : PORT_INSET + MIN_GAP;
+        if (ch.start.t === 'port' && !blocked(PORT_INSET / 2)) expect(mine[0]!, label).toBeLessThanOrEqual(reach);
+        if (ch.end.t === 'port' && !blocked(L - PORT_INSET / 2)) expect(L - mine[mine.length - 1]!, label).toBeLessThanOrEqual(reach);
+        // No post inside a junction clearance, except at a corner or free end, or as a run's only post (behind a device terminal).
+        const corner = (s: number) => sup.some((p) => p.chain === idx && Math.abs(p.s - s) < 1e-6) && ch.pts.some((_, i) => i > 0 && i < ch.pts.length - 1 && Math.abs(runLen({ ...ch, pts: ch.pts.slice(0, i + 1) }) - s) < 1e-6);
+        const freeEnd = (s: number) => (ch.start.t === 'free' && s < 1e-6) || (ch.end.t === 'free' && s > L - 1e-6);
+        if (mine.length > 1) for (const s of mine) if (!corner(s) && !freeEnd(s)) expect(zones[idx]!.all.some((k) => Math.abs(s - k.s) < k.d - 1e-6), `${label}: post at ${s.toFixed(2)} inside a junction clearance`).toBe(false);
+      });
+    });
+  }
 });
 
 describe('buildScene (DOM-free paths)', () => {
