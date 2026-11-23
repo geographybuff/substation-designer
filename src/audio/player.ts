@@ -1,14 +1,17 @@
 /**
  * Plays the game's sounds through Web Audio. Sounds are synthesized once per
- * (sound, sample rate) and cached as AudioBuffers; recorded samples from
- * assets/audio/ are layered in when present. Nothing touches the browser until
- * the first sound plays, so the module is safe to import under Node.
+ * (sound, sample rate) and cached as AudioBuffers. Recorded clips (assets/audio,
+ * see samples.ts) are layered over the synthesized sound for the same event,
+ * aligned on its main transient. Synthesized sounds and clips are normalized to the
+ * same loudness scale, and a layered pair is mixed with weights whose powers sum to
+ * one, so adding a recording does not make an event louder. Nothing touches the
+ * browser until the first sound plays, so the module is safe to import under Node.
  */
 import type { DesignReview } from '../engine/review';
 import type { Design, LevelDef, PlacedItem } from '../engine/types';
 import { energizeSpec, faultScenario, type FaultScenario } from './faults';
-import { sampleUrl, type SampleSlot } from './samples';
-import { renderArc, renderEnergize, renderEquipment, renderUi, type UiSound } from './sounds';
+import { SAMPLES, sampleUrl, type SampleSlot } from './samples';
+import { arcOffsetDb, arcTimeline, energizeTimeline, equipmentHitS, equipmentOffsetDb, renderArc, renderEnergize, renderEquipment, renderUi, type UiSound } from './sounds';
 
 interface Settings {
   enabled: boolean;
@@ -16,11 +19,14 @@ interface Settings {
   volume: number;
 }
 
+/** Gains for a layered event: synthesized and recorded parts, powers summing to one. */
+export const LAYER = { synth: 0.6, sample: 0.8 } as const;
+
 let settings: Settings = { enabled: true, volume: 0.7 };
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 const buffers = new Map<string, AudioBuffer>();
-const samples = new Map<SampleSlot, Promise<AudioBuffer | null>>();
+const decoded = new Map<SampleSlot, Promise<AudioBuffer | null>>();
 const playing = new Set<AudioBufferSourceNode>();
 
 export function configureAudio(s: Partial<Settings>): void {
@@ -42,11 +48,13 @@ function context(): AudioContext | null {
     }
     master = ctx.createGain();
     master.gain.value = settings.volume;
-    // Gentle limiter so overlapping sounds never clip.
+    // Safety net only: every sound is already loudness-normalized below the peak ceiling.
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -6;
-    comp.ratio.value = 8;
+    comp.threshold.value = -3;
+    comp.ratio.value = 12;
     master.connect(comp).connect(ctx.destination);
+    // Decode the clips up front so the first layered sound lines up.
+    for (const slot of Object.keys(SAMPLES) as SampleSlot[]) sample(slot);
   }
   if (ctx.state === 'suspended') void ctx.resume();
   return ctx;
@@ -70,22 +78,27 @@ function cached(key: string, make: (sr: number) => Float32Array): AudioBuffer | 
   return b;
 }
 
-function start(b: AudioBuffer, o: { gain?: number; rate?: number; when?: number; duration?: number } = {}): void {
+/** Start a buffer at context time `at`, `offset` seconds into it, optionally fading out after `duration`. */
+function startAt(b: AudioBuffer, at: number, o: { gain?: number; rate?: number; offset?: number; duration?: number } = {}): void {
   const c = ctx;
   if (!c || !master) return;
   const src = c.createBufferSource();
   src.buffer = b;
   if (o.rate) src.playbackRate.value = o.rate;
   const g = c.createGain();
-  g.gain.value = o.gain ?? 1;
+  const gain = o.gain ?? 1;
+  g.gain.value = gain;
   src.connect(g).connect(master);
-  const t = c.currentTime + (o.when ?? 0);
+  const t = Math.max(c.currentTime, at);
+  const offset = (o.offset ?? 0) + Math.max(0, c.currentTime - at) * (o.rate ?? 1);
+  if (offset >= b.duration) return;
   if (o.duration !== undefined) {
-    // Fade a layered sample out with the synthesized sound it accompanies.
-    g.gain.setValueAtTime(o.gain ?? 1, t + Math.max(0, o.duration - 0.15));
-    g.gain.linearRampToValueAtTime(0, t + o.duration);
-    src.start(t, 0, o.duration);
-  } else src.start(t);
+    const end = t + Math.max(0.02, o.duration - (t - at));
+    g.gain.setValueAtTime(gain, Math.max(t, end - 0.12));
+    g.gain.linearRampToValueAtTime(0, end);
+    src.start(t, offset);
+    src.stop(end + 0.01);
+  } else src.start(t, offset);
   playing.add(src);
   src.onended = () => playing.delete(src);
 }
@@ -101,48 +114,77 @@ function stopAll(): void {
   playing.clear();
 }
 
-/** Decode a bundled sample once (null when the slot has no file or it cannot be decoded). */
+/** Decode a bundled clip once (null when the slot has no file or it cannot be decoded). */
 function sample(slot: SampleSlot): Promise<AudioBuffer | null> {
-  let p = samples.get(slot);
+  let p = decoded.get(slot);
   if (!p) {
     const url = sampleUrl(slot);
     const c = ctx;
     p = !url || !c ? Promise.resolve(null) : fetch(url).then((r) => r.arrayBuffer()).then((a) => c.decodeAudioData(a)).catch(() => null);
-    samples.set(slot, p);
+    decoded.set(slot, p);
   }
   return p;
 }
 
-function layer(slot: SampleSlot, duration: number, gain: number, rate = 1, when = 0): void {
-  if (!ctx) return;
-  const at = ctx.currentTime + when;
+const has = (slot: SampleSlot) => !!SAMPLES[slot] && !!sampleUrl(slot);
+
+/**
+ * Layer a clip so its main transient lands `hitAt` seconds from `t0` (context time), at `gainDb`
+ * relative to its normalized level, for at most `duration` seconds.
+ */
+function layer(slot: SampleSlot, t0: number, o: { hitAt?: number; gainDb?: number; duration?: number; rate?: number; fromStart?: boolean } = {}): void {
+  const info = SAMPLES[slot];
+  if (!ctx || !info) return;
+  const rate = o.rate ?? 1;
+  // Align the clip's transient (or its start, for steady sounds) on the event.
+  const lead = o.fromStart ? 0 : info.hitS / rate;
+  const at = t0 + (o.hitAt ?? 0) - lead;
+  const offset = at < t0 ? (t0 - at) * rate : 0;
+  const gain = LAYER.sample * 10 ** ((o.gainDb ?? 0) / 20);
   void sample(slot).then((b) => {
-    if (b && ctx) start(b, { gain, rate, when: Math.max(0, at - ctx.currentTime), duration: Math.min(duration, b.duration / rate) });
+    if (b && ctx) startAt(b, Math.max(at, t0), { gain, rate, offset, duration: o.duration });
   });
 }
 
 const SLOT_OF: Partial<Record<PlacedItem['kind'], SampleSlot>> = {
   transformer: 'transformer-hum',
+  regulator: 'transformer-hum',
+  station_service: 'transformer-hum',
   breaker: 'breaker',
   circuit_switcher: 'breaker',
   recloser: 'recloser',
   switch: 'switch',
+  hookstick_switch: 'switch',
   fuse: 'fuse',
 };
+
+const CLOSE_SLOT: Record<'breaker' | 'recloser' | 'switch' | 'circuit_switcher', SampleSlot> = { breaker: 'breaker', circuit_switcher: 'breaker', recloser: 'recloser', switch: 'switch' };
 
 export const sfx = {
   /** About two seconds of a newly placed component's normal operating sound. */
   placed(it: Pick<PlacedItem, 'kind' | 'kv' | 'props'>): void {
     const key = `eq:${it.kind}:${it.kv}:${it.props.kva ?? ''}:${it.props.cooling ?? ''}:${it.props.ltc ? 1 : 0}`;
     const b = cached(key, (sr) => renderEquipment({ kind: it.kind, kv: it.kv, props: it.props }, sr, 7));
-    if (!b) return;
-    start(b);
-    const slot = SLOT_OF[it.kind];
-    if (slot) layer(slot, b.duration, 0.6);
+    if (!b || !ctx) return;
+    const t0 = ctx.currentTime;
+    let slot = SLOT_OF[it.kind];
+    if ((it.kind === 'line_terminal' || it.kind === 'feeder_exit') && it.kv >= 100) slot = 'corona';
+    const layered = !!slot && has(slot);
+    startAt(b, t0, { gain: layered ? LAYER.synth : 1 });
+    if (!slot || !layered) return;
+    const offset = equipmentOffsetDb({ kind: it.kind, kv: it.kv, props: it.props });
+    const hit = equipmentHitS(it.kind, it.kv);
+    if (slot === 'transformer-hum' || slot === 'corona') layer(slot, t0, { fromStart: true, gainDb: offset, duration: b.duration });
+    // A hook stick switch is smaller and lighter than a gang-operated disconnect: play the clank higher.
+    else layer(slot, t0, { hitAt: hit ?? 0, gainDb: offset, rate: it.kind === 'hookstick_switch' ? 1.3 : 1 });
   },
   ui(name: UiSound, kv?: number): void {
     const b = cached(`ui:${name}:${kv ?? ''}`, (sr) => renderUi(name, sr, 3, kv));
-    if (b) start(b);
+    if (!b || !ctx) return;
+    const slot: SampleSlot | undefined = name === 'fence' ? 'gate' : name === 'click' ? 'relay' : undefined;
+    const layered = !!slot && has(slot);
+    startAt(b, ctx.currentTime, { gain: layered ? LAYER.synth : 1 });
+    if (slot && layered) layer(slot, ctx.currentTime, { hitAt: 0.03 });
   },
   /**
    * Energize: a design without critical findings closes in and hums; otherwise the worst failure
@@ -154,11 +196,24 @@ export const sfx = {
       const a = fault.arc;
       const key = `arc:${a.kind}:${a.kv}:${a.faultKA.toFixed(2)}:${a.clearing}:${a.remoteS}`;
       const b = cached(key, (sr) => renderArc(a, sr, 11).pcm);
-      if (b) {
-        start(b);
-        // Higher voltage, bigger arc: play a recorded arc slower (lower) for big ones.
-        layer(a.kind === 'phase' || a.kind === 'ground' ? 'flashover' : 'arc', Math.min(b.duration, 2), 0.7, Math.max(0.6, Math.min(1.3, 1.25 - a.kv / 400)));
+      if (!b || !ctx) return { fault };
+      const t0 = ctx.currentTime;
+      const roar: SampleSlot = a.kind === 'phase' || a.kind === 'ground' ? 'flashover' : 'arc';
+      startAt(b, t0, { gain: has(roar) ? LAYER.synth : 1 });
+      const tl = arcTimeline(a);
+      const off = arcOffsetDb(a);
+      // Each shot: the pressure wave, then the arc burning until the device interrupts it.
+      tl.shots.forEach((s, i) => {
+        layer('blast', t0, { hitAt: s.t, gainDb: off - (i ? 3 : 0) });
+        layer(roar, t0 + s.t, { fromStart: true, gainDb: off, duration: s.dur + 0.03 });
+      });
+      for (const t of tl.trips) {
+        if (a.clearing === 'fuse') layer('blast', t0, { hitAt: t, gainDb: off - 2 });
+        else if (a.clearing === 'recloser') layer('recloser', t0, { hitAt: t });
+        else if (a.clearing === 'breaker' || a.clearing === 'circuit_switcher') layer('breaker', t0, { hitAt: t });
       }
+      for (const t of tl.recloses) layer('recloser', t0, { hitAt: t, gainDb: -2 });
+      if (tl.rupture !== undefined) layer('blast', t0, { hitAt: tl.rupture, gainDb: off, rate: 0.55 });
       return { fault };
     }
     const spec = energizeSpec(design, level, review);
@@ -167,12 +222,14 @@ export const sfx = {
       return { fault: null };
     }
     const b = cached(`energize:${spec.kv}:${spec.kva}:${spec.closings.slice(0, 4).join(',')}:${spec.fans}`, (sr) => renderEnergize(spec, sr, 5));
-    if (b) {
-      start(b);
-      const t1 = 0.2 + Math.max(0, Math.min(4, spec.closings.length) - 1) * 0.32;
-      if (spec.kva > 0) layer('transformer-hum', b.duration - t1, 0.5, 1, t1);
-      if (spec.kv >= 100) layer('corona', b.duration - t1, 0.4, 1, t1);
-    }
+    if (!b || !ctx) return { fault: null };
+    const t0 = ctx.currentTime;
+    const tl = energizeTimeline(spec);
+    const layered = has('transformer-hum') || tl.closes.some((c) => has(CLOSE_SLOT[c.kind]));
+    startAt(b, t0, { gain: layered ? LAYER.synth : 1 });
+    for (const c of tl.closes) layer(CLOSE_SLOT[c.kind], t0, { hitAt: c.t });
+    if (spec.kva > 0) layer('transformer-hum', t0 + tl.humAt, { fromStart: true, duration: tl.total - tl.humAt });
+    if (spec.kv >= 100) layer('corona', t0 + tl.humAt, { fromStart: true, gainDb: -4, duration: tl.total - tl.humAt });
     return { fault: null };
   },
   stop: stopAll,

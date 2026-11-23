@@ -22,7 +22,16 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
   trips in about seven cycles, and with nothing in the station the arc burns until the far end of
   the line trips (and the transformer tank ruptures). The Results screen says what you heard and can
   replay it.
-- Settings → Audio: sound on or off, and volume.
+- Real recordings layered over the synthesized sounds: a high-voltage transformer's hum, corona from
+  a 500 kV substation, a 280 kV flashover, a 20 kV power arc, a large three-phase switch, a service
+  breaker tripping and latching, a steel blade seating, a gate for the fence. Each clip lines up with
+  the event it accompanies (the breaker's close, each arc's ignition and each trip). Recordings made on
+  50 Hz power are sped up to 60 Hz so every hum and arc pulses at 120 Hz like North American equipment.
+- Every sound, synthesized or recorded, is set to one loudness scale (ITU-R BS.1770): placing any
+  piece of equipment sounds about as loud as any other, a big transformer or arc is only a little
+  louder than a small one, and a fault is louder than equipment but never startling.
+- Settings → Audio: sound on or off, and volume. The Credits screen lists each recording with a link
+  to its page.
 
 ### Changed
 - Tutorial: a step that asks for one voltage now highlights only that toolbox entry (First Light's

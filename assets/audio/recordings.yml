@@ -1,0 +1,656 @@
+# Recorded sounds for Substation Designer: where each recording came from, its licence, its native
+# mains frequency, and which clips of it the game uses.
+#
+# Hums, arcs and corona pulse at twice the mains frequency: 100 Hz on 50 Hz systems, 120 Hz on 60 Hz
+# systems. `node scripts/build-audio.mjs <download-folder>` builds one clip per slot for `systemHz`:
+# for each slot it takes the first candidate recorded on that frequency and otherwise converts the
+# first candidate, resampling it by systemHz / mainsHz (speed and pitch together, so 100 Hz becomes
+# 120 Hz). Clips with `followsMains: false` (switchgear, impacts) sound the same on any system and are
+# never converted. A version of the game for a 50 Hz country sets `systemHz: 50`; candidates recorded
+# on 50 Hz are then preferred and 60 Hz ones converted down.
+#
+# mainsHz is measured, not guessed: the strength of the harmonic comb at k x 100 Hz against k x 120 Hz
+# (k = 1..4; 600 Hz is ignored because it belongs to both). null means the recording has no mains
+# component worth measuring.
+#
+# Every clip is normalized to its category's loudness (maximum momentary loudness, ITU-R BS.1770,
+# 400 ms window) with a peak ceiling, the same scale the game's synthesized sounds use, so no sound is
+# much louder or quieter than the rest. The build writes assets/audio/sounds.json (what the game reads)
+# and one Ogg Vorbis file per slot.
+
+systemHz: 60 # every campaign site is a US cooperative
+
+loudness:
+  # Maximum momentary loudness in LUFS for each kind of sound.
+  categories:
+    ui: -28 # editor clicks, bus, fence, erase
+    equipment: -23 # a component's operating sound when it is placed
+    energize: -21 # the station closing in
+    fault: -17 # arcing faults; loudest, but only 6 LU above equipment
+  # Sample peak ceiling (dBFS) after normalization; transients above it are limited.
+  peakCeilingDb: -1.5
+
+# Allowed licences (SPDX ids). CC-BY needs the credit shown on the Credits screen.
+licenses: [CC0-1.0, CC-BY-3.0, CC-BY-4.0, OGA-BY-3.0, OGA-BY-4.0]
+
+slots:
+  transformer-hum:
+    category: equipment
+    use: Under the synthesized hum when a transformer, regulator or station service transformer is placed, and when the station is energized.
+    candidates:
+      - { recording: bsb-2437, start: 3.5, end: 7.0, followsMains: true, highpass: 60, fadeIn: 0.2, fadeOut: 0.4 }
+      - { recording: fs-395223, start: 2.0, end: 5.5, followsMains: true, highpass: 60, fadeIn: 0.2, fadeOut: 0.4 }
+  corona:
+    category: equipment
+    use: Energized high-voltage buses and lines (100 kV and up), and when such a station is energized.
+    candidates:
+      - { recording: fs-809439, start: 110.0, end: 113.0, followsMains: true, highpass: 80, fadeIn: 0.2, fadeOut: 0.4 }
+      - { recording: fs-347046, start: 3.0, end: 6.0, followsMains: true, highpass: 300, fadeIn: 0.2, fadeOut: 0.4 }
+  flashover:
+    category: fault
+    use: Clearance flashovers (phase to phase, phase to ground) when a design with critical findings is energized; restarted at each reclose.
+    candidates:
+      - { recording: fs-367454, start: 0.0, end: 2.0, followsMains: true, highpass: 40, fadeIn: 0.0, fadeOut: 0.3 }
+  arc:
+    category: fault
+    use: Insulation failures and transformer internal faults; the burning arc between ignition and clearing.
+    candidates:
+      - { recording: fs-210878, start: 0.6, end: 2.6, followsMains: true, highpass: 40, fadeIn: 0.01, fadeOut: 0.3 }
+      - { recording: fs-499690, start: 18.0, end: 20.0, followsMains: true, highpass: 40, fadeIn: 0.01, fadeOut: 0.3 }
+  breaker:
+    category: equipment
+    use: Power circuit breakers and circuit switchers closing (placement, energizing) and tripping.
+    candidates:
+      - { recording: fs-139970, start: 1.25, end: 2.6, followsMains: false, channels: mix, fadeIn: 0.01, fadeOut: 0.5 }
+  recloser:
+    category: equipment
+    use: Reclosers closing (placement, energizing), tripping and reclosing onto a fault.
+    candidates:
+      - { recording: bsb-1092, start: 13.75, end: 14.3, followsMains: false, fadeIn: 0.005, fadeOut: 0.1 }
+  switch:
+    category: equipment
+    use: Disconnect and hook stick switches closing.
+    candidates:
+      - { recording: bsb-0235, start: 0.0, end: 1.0, followsMains: false, fadeIn: 0.002, fadeOut: 0.25 }
+  fuse:
+    category: equipment
+    use: Power fuses snapped into their mountings when placed.
+    candidates:
+      - { recording: bsb-1092, start: 3.97, end: 4.4, followsMains: false, fadeIn: 0.005, fadeOut: 0.1 }
+  gate:
+    category: ui
+    use: Placing the fence (the gate swung shut).
+    candidates:
+      - { recording: bsb-2360, start: 0.2, end: 2.4, followsMains: false, fadeIn: 0.005, fadeOut: 0.5 }
+  relay:
+    category: ui
+    use: Small clicks in the editor.
+    candidates:
+      - { recording: bsb-2191, start: 0.0, end: 0.084, followsMains: false, fadeIn: 0.0, fadeOut: 0.02 }
+  blast:
+    category: fault
+    use: The pressure wave of an arc igniting, an expulsion fuse's report, a transformer tank rupturing.
+    candidates:
+      - { recording: bsb-1808, start: 0.0, end: 0.325, followsMains: false, fadeIn: 0.0, fadeOut: 0.1 }
+
+# All recordings considered, used or not. `file` is the name in the shared download folder; the build
+# finds each file by its sha256, so renamed copies work too.
+recordings:
+  - id: bsb-2437
+    library: BigSoundBank
+    title: "Electric transformer #4"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/electric-transformer-4-s2437.html
+    license: CC0-1.0
+    file: "2437.wav"
+    sha256: 546f89f8950b4e685efb3f7451aa09d7c2dfbb744fb39ca3c9f0b98005ab7955
+    durationS: 13.36
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +37/+44/+49/+54 dB over the local noise"
+    verdict: "Used: transformer-hum. Outdoor high-voltage transformer; clean, steady harmonic series."
+
+  - id: bsb-0064
+    library: BigSoundBank
+    title: "Electric transformer #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/electric-transformer-1-s0064.html
+    license: CC0-1.0
+    file: "0064.wav"
+    sha256: f1a9a59fbc1d6e0f7815d81279643e0c1dce8fb3cbb6cd15c4a0577decdae4ab
+    durationS: 10.75
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: very quiet (-48 LUFS) and noisy, no clear harmonic series."
+
+  - id: bsb-0086
+    library: BigSoundBank
+    title: "Electric Transformer #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/electric-transformer-2-s0086.html
+    license: CC0-1.0
+    file: "0086.wav"
+    sha256: 8af8676c515dee6cbe354a464831c9b7c9a3a0fb566a9f713152da597d617262
+    durationS: 2.43
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +7/+22/+24/+34 dB over the local noise"
+    verdict: "Not used: dominated by low-frequency rumble."
+
+  - id: bsb-0467
+    library: BigSoundBank
+    title: "Electric transformer #3"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/tansfo-electrique-s0467.html
+    license: CC0-1.0
+    file: "0467.wav"
+    sha256: 82c561721837d52e4fbfde890e9a19277795e835078e8a015d9800fef3a0cf46
+    durationS: 4.64
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +28/+2/+4/+3 dB over the local noise"
+    verdict: "Not used: thin 100 Hz tone under a 4-6 kHz whine; small transformer."
+
+  - id: fs-395223
+    library: Freesound
+    title: "substation1.wav"
+    author: "AGC66"
+    page: https://freesound.org/people/AGC66/sounds/395223/
+    license: CC0-1.0
+    file: "395223__agc66__substation1.wav"
+    sha256: 702dd031c65cc1c80ecb0c69b15dc64e6f24ff8a73b9c569f5401de8171f18b5
+    durationS: 9.89
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +31/+33/+37/+38 dB over the local noise"
+    verdict: "Backup for transformer-hum (prefer for 50 Hz systems after 2437). Very quiet original (-60 LUFS) but a clean comb."
+
+  - id: fs-495893
+    library: Freesound
+    title: "Hig Voltage Transformer"
+    author: "AngriestBrad"
+    page: https://freesound.org/people/AngriestBrad/sounds/495893/
+    license: CC0-1.0
+    file: "495893__angriestbrad__hig-voltage-transformer.wav"
+    sha256: 985310daaa7a801c05a299464dd406b0eab98d143124b8645e2d602f78ea7f37
+    durationS: 16.29
+    mainsHz: 60
+    mainsEvidence: "comb at 120/240/360/480 Hz: +24/+38/+27/+35 dB over the local noise"
+    verdict: "Not used: quiet, with handling noises at 4.5, 9-10 and 13 s."
+
+  - id: fs-118766
+    library: Freesound
+    title: "120hz ground hum.WAV"
+    author: "thedapperdan"
+    page: https://freesound.org/people/thedapperdan/sounds/118766/
+    license: CC0-1.0
+    file: "118766__thedapperdan__120hz-ground-hum.wav"
+    sha256: 96d73767e5082bfbe6cf79e60cebdc95f0d2ef226f48153e2cfcbbaf7a1227c9
+    durationS: 6.62
+    mainsHz: 60
+    mainsEvidence: "comb at 120/240/360/480 Hz: +50/+36/+17/+38 dB over the local noise"
+    verdict: "Not used: a parking-garage lamp ballast, not substation equipment."
+
+  - id: bsb-2118
+    library: BigSoundBank
+    title: "Neon or transformer #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/neon-or-transformer-1-s2118.html
+    license: CC0-1.0
+    file: "2118.wav"
+    sha256: 1f98b9507fc2b4556749110c7ec375552cd58010e5c9738a374da32b7d95d21e
+    durationS: 9.89
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: computer-generated comb (every harmonic of 20 Hz), not a recording."
+
+  - id: bsb-2119
+    library: BigSoundBank
+    title: "Neon or transformer #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/neon-or-transformer-2-s2119.html
+    license: CC0-1.0
+    file: "2119.wav"
+    sha256: cd1f528b1baa91f620a3779292cc542dc3197e9bf982dec6ee88843c8c4f7d79
+    durationS: 9.89
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: computer-generated comb, not a recording."
+
+  - id: bsb-2120
+    library: BigSoundBank
+    title: "Neon or transformer #3"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/neon-or-transformer-3-s2120.html
+    license: CC0-1.0
+    file: "2120.wav"
+    sha256: 55135c4d251fef84e0b5e3e2d47b191711f08d46ba51fb94452f7a71134819b1
+    durationS: 9.89
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: computer-generated comb, not a recording."
+
+  - id: fs-809439
+    library: Freesound
+    title: "Acoustic Emission from a 500 kV Reactor Bank - Power Substation"
+    author: "ricardoemfield"
+    page: https://freesound.org/people/ricardoemfield/sounds/809439/
+    license: CC-BY-4.0
+    file: "809439__ricardoemfield__acoustic-emission-from-a-500-kv-reactor-bank-power-substation.wav"
+    sha256: 8910dd8efa5538ee082514ef49c6acaf06b6956da27b5a6c08e29b5fc91e2bfe
+    durationS: 262.72
+    mainsHz: 60
+    mainsEvidence: "comb at 120/240/360/480 Hz: +30/+36/+44/+43 dB over the local noise"
+    verdict: "Used: corona. 500 kV reactor bank in Brazil (60 Hz): 120/240/360/480 Hz tones with corona crackle to 16 kHz."
+
+  - id: fs-347046
+    library: Freesound
+    title: "765 kilo-volt transmission lines buzzing and crackling"
+    author: "johnaudiotech"
+    page: https://freesound.org/people/johnaudiotech/sounds/347046/
+    license: CC0-1.0
+    file: "347046__johnaudiotech__765-kilo-volt-transmission-lines-buzzing-and-crackling.wav"
+    sha256: 699d1299c4015e058a92c0db8786d0d0e20e72da2db8160fb05caa378aa3c522
+    durationS: 23.21
+    mainsHz: 60
+    mainsEvidence: "comb at 120/240/360/480 Hz: +9/+12/+15/+8 dB over the local noise"
+    verdict: "Backup for corona. 765 kV lines in Ohio: mostly wind rumble with an 8 kHz hiss band; needs a high-pass."
+
+  - id: fs-740199
+    library: Freesound
+    title: "Zapping - Electrical High Voltage - Longer Sample"
+    author: "el_boss"
+    page: https://freesound.org/people/el_boss/sounds/740199/
+    license: CC0-1.0
+    file: "740199__el_boss__zapping-electrical-high-voltage-longer-sample.mp3"
+    sha256: 8c8be15a22048044225cd35102f91ca81e0afc960826d3266171f65fea8bd0f0
+    durationS: 66.08
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: broadband zapping, sounds like an insect zapper."
+
+  - id: bsb-1252
+    library: BigSoundBank
+    title: "Electrical fence"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/electrical-fence-s1252.html
+    license: CC0-1.0
+    file: "1252.wav"
+    sha256: 2560e7fd1dcb6c3cf98630c3531827066d76547eef1f170e71f0560ab313a0df
+    durationS: 9.39
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: electric fence pulses, one click every 1.55 s."
+
+  - id: fs-367454
+    library: Freesound
+    title: "Flashover discharge 280KV.wav"
+    author: "jensfelger"
+    page: https://freesound.org/people/jensfelger/sounds/367454/
+    license: CC0-1.0
+    file: "367454__jensfelger__flashover-discharge-280kv.wav"
+    sha256: 4f58adcac7fcc22b843d49e48c3df0cefda015a1fe4815bbc85173f68e6984f1
+    durationS: 8.42
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +22/+19/+8/+2 dB over the local noise"
+    verdict: "Used: flashover. 280 kV laboratory flashover; 7 s sustained discharge with a sharp ignition."
+
+  - id: fs-210878
+    library: Freesound
+    title: "highvoltagearc.wav"
+    author: "Sclolex"
+    page: https://freesound.org/people/Sclolex/sounds/210878/
+    license: CC0-1.0
+    file: "210878__sclolex__highvoltagearc.wav"
+    sha256: ba5f2862884dde6b37018a6ecc0cf44f6509a63430e4dc8a4ef00c0dd6ee0ee1
+    durationS: 5.59
+    mainsHz: 60
+    mainsEvidence: "comb at 120/240/360/480 Hz: +20/+23/+17/+16 dB over the local noise"
+    verdict: "Used: arc. 20 kV AC arc-over; crackling, spitting power arc."
+
+  - id: fs-499690
+    library: Freesound
+    title: "High Voltage Sparks 3x"
+    author: "Kinoton"
+    page: https://freesound.org/people/Kinoton/sounds/499690/
+    license: CC0-1.0
+    file: "499690__kinoton__high-voltage-sparks-3x.wav"
+    sha256: 9fd77390a382ce7506002f8f976d4d1c3574dbcd5bce01569024c2f4b1ea286c
+    durationS: 56.74
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +35/+26/+26/+17 dB over the local noise"
+    verdict: "Backup for arc (prefer for 50 Hz systems). Three sustained high-voltage arcs; monotonous buzz."
+
+  - id: fs-396470
+    library: Freesound
+    title: "Electric Sparks.wav"
+    author: "kev_durr"
+    page: https://freesound.org/people/kev_durr/sounds/396470/
+    license: CC0-1.0
+    file: "396470__kev_durr__electric-sparks.wav"
+    sha256: 5391b6266ecf5026e20f1bf991464566e607c6663f21a08ce22f18b9e05200fc
+    durationS: 11.8
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: 35 kV DC sparks, so no mains pulsing."
+
+  - id: bsb-0952
+    library: BigSoundBank
+    title: "Short welds"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/short-welds-s0952.html
+    license: CC0-1.0
+    file: "0952.wav"
+    sha256: 68a23b30146a05aea4a5c10ed890de3e69d8a0746fc8a4884921b69ec0e10ed9
+    durationS: 9.32
+    mainsHz: 50
+    mainsEvidence: "comb at 100/200/300/400 Hz: +22/+21/+11/+5 dB over the local noise"
+    verdict: "Not used: welding arcs, not power-system arcs."
+
+  - id: bsb-2143
+    library: BigSoundBank
+    title: "Flashing light bulb #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/flashing-light-bulb-1-s2143.html
+    license: CC0-1.0
+    file: "2143.wav"
+    sha256: 7cb5c1af1db9e00389fc04f82fb17575dc28b98bba3ae363a6957e0c543cbdf6
+    durationS: 0.47
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: tiny bulb crackle."
+
+  - id: bsb-2144
+    library: BigSoundBank
+    title: "Flashing light bulb #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/flashing-light-bulb-2-s2144.html
+    license: CC0-1.0
+    file: "2144.wav"
+    sha256: 485ea95a7a3325a74eb7fa7b7097b2ed9e4ea4456ab70f46f4a02934f1c4c7fd
+    durationS: 0.82
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: tiny bulb crackle."
+
+  - id: bsb-2145
+    library: BigSoundBank
+    title: "Flashing light bulb #3"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/flashing-light-bulb-3-s2145.html
+    license: CC0-1.0
+    file: "2145.wav"
+    sha256: b35ce5483bb762a91eab3f78b52a186dce62547898bee9743cf7b7143755e66b
+    durationS: 0.64
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: tiny bulb crackle."
+
+  - id: bsb-2146
+    library: BigSoundBank
+    title: "Flashing Light Bulb #4"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/flashing-light-bulb-4-s2146.html
+    license: CC0-1.0
+    file: "2146.wav"
+    sha256: a65475723868d48281fc916d80f23f44ac88283e9a434c0991fda2b7ad069b1c
+    durationS: 1.4
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: tiny bulb crackle."
+
+  - id: fs-139970
+    library: Freesound
+    title: "Switch.Big.Power.wav"
+    author: "jessepash"
+    page: https://freesound.org/people/jessepash/sounds/139970/
+    license: CC0-1.0
+    file: "139970__jessepash__switchbigpower.wav"
+    sha256: fa47df051b363d33f6aeb1ef48bb9f72b76a0753e944fece4b7b0102edc642a7
+    durationS: 8.83
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: breaker. Large three-phase switch thrown; one heavy transient with station buzz behind it."
+
+  - id: bsb-1092
+    library: BigSoundBank
+    title: "Electric circuit breaker"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/electric-circuit-breaker-s1092.html
+    license: CC0-1.0
+    file: "1092.wav"
+    sha256: 9ab7f927c64f558f006134cb70234a8d8a5c4657225444375e286fa65af0d5fb
+    durationS: 16.5
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: recloser (trip and latch at 13.8 s) and fuse (single clack at 4.0 s). Eight trip/close events of a service breaker."
+
+  - id: fs-131599
+    library: Freesound
+    title: "Kill Switch (Large Breaker Switch) .WAV"
+    author: "EchoCinematics"
+    page: https://freesound.org/people/EchoCinematics/sounds/131599/
+    license: CC0-1.0
+    file: "131599__echocinematics__kill-switch-large-breaker-switch.wav"
+    sha256: 284033884b65d52a65a78b0125753863a314ce9162d8b8454831c1dfb73700be
+    durationS: 2.28
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: designed (cinematic) sound, 6 channels with only front left/right used."
+
+  - id: fs-807384
+    library: Freesound
+    title: "Contactor/motor overload relay noises"
+    author: "tt_runscript"
+    page: https://freesound.org/people/tt_runscript/sounds/807384/
+    license: CC0-1.0
+    file: "807384__tt_runscript__contactormotor-overload-relay-noises.m4a"
+    sha256: 0970b899e92bf9fb57f7e2efdf5ed32599fe62e28c0d99ad2792e652b99930a2
+    durationS: 112.26
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: small contactor clicks; lighter than substation switchgear."
+
+  - id: bsb-3061
+    library: BigSoundBank
+    title: "Industrial switch #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/industrial-switch-1-s3061.html
+    license: CC0-1.0
+    file: "3061.wav"
+    sha256: b5e7b6f8d9357c5978f31298844eeefaaf8b9efb6ff0346109145684ad0b2d1a
+    durationS: 3.03
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: designed industrial switch with added reverb."
+
+  - id: bsb-3062
+    library: BigSoundBank
+    title: "Industrial switch #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/industrial-switch-2-s3062.html
+    license: CC0-1.0
+    file: "3062.wav"
+    sha256: eb6f8b0ce040f6ae7ee1be70cbb4821813d4f6dbc1aff5e8e219961af34d197e
+    durationS: 3.0
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: designed industrial switch with added reverb."
+
+  - id: bsb-3063
+    library: BigSoundBank
+    title: "Industrial Switch #3"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/industrial-switch-3-s3063.html
+    license: CC0-1.0
+    file: "3063.wav"
+    sha256: b711e6d9a58a10a4e1aa384617b71211e596f627e85a033fad70e47aa5795a6c
+    durationS: 2.99
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: designed industrial switch with added reverb."
+
+  - id: bsb-0235
+    library: BigSoundBank
+    title: "Iron bar falls #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/iron-bar-falls-2-s0235.html
+    license: CC0-1.0
+    file: "0235.wav"
+    sha256: 9ce86b2c5bae13b478ecbb8e02c07d9ef00db5d48eebd4ebb09b9338b10a7632
+    durationS: 1.13
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: switch. Steel bar impact then seating: a disconnect blade closing into its jaws."
+
+  - id: bsb-1771
+    library: BigSoundBank
+    title: "Falling sheet steel bar #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/falling-sheet-steel-bar-1-s1771.html
+    license: CC0-1.0
+    file: "1771.wav"
+    sha256: 780f68676cb6e23f282c1433bc5e895b6fe009d0197c328748f0754510918d12
+    durationS: 1.03
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: thinner single ring; 0235 has the two-stage blade seating."
+
+  - id: fs-94127
+    library: Freesound
+    title: "Clank1.wav"
+    author: "BMacZero"
+    page: https://freesound.org/people/BMacZero/sounds/94127/
+    license: CC0-1.0
+    file: "94127__bmaczero__clank1.wav"
+    sha256: 899a46a8423fa0ca349b3c70a07a422d1eaa3a58695ce6facfbae074dd70226f
+    durationS: 0.67
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: spring-lever clank; kept as an alternative switch latch."
+
+  - id: bsb-2191
+    library: BigSoundBank
+    title: "Thermostat #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/thermostat-1-s2191.html
+    license: CC0-1.0
+    file: "2191.wav"
+    sha256: cee98279861a0fa0ed277b72bbd79ca889e8e12bf56db92baa8a2e3523584414
+    durationS: 0.08
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: relay (small clicks in the editor)."
+
+  - id: bsb-2192
+    library: BigSoundBank
+    title: "Thermostat #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/thermostat-2-s2192.html
+    license: CC0-1.0
+    file: "2192.wav"
+    sha256: 837e213d1b4d2831daafe6e14d80a656f21b220683921e446981e5251a74fcde
+    durationS: 0.1
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: near-duplicate of 2191."
+
+  - id: fs-384698
+    library: Freesound
+    title: "A relay switch being activated."
+    author: "bassmosphere"
+    page: https://freesound.org/people/bassmosphere/sounds/384698/
+    license: CC0-1.0
+    file: "384698__bassmosphere__a-relay-switch-being-activated.wav"
+    sha256: 8ebf472047cecc1795c20b11a54e85d0e284227f45b867f8987bde4dc14403ff
+    durationS: 0.19
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: pinball relay, too bright."
+
+  - id: bsb-1808
+    library: BigSoundBank
+    title: "Explosion #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/explosion-2-s1808.html
+    license: CC0-1.0
+    file: "1808.wav"
+    sha256: d0c74f7c01ab4bebc45f346696be1167af9b6e6c932528215aa0df9932a639bb
+    durationS: 0.33
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: blast (arc ignition, expulsion fuse report, tank rupture)."
+
+  - id: bsb-2360
+    library: BigSoundBank
+    title: "Metal barrier: Closure #3"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/grinding-metal-barrier-closure-3-s2360.html
+    license: CC0-1.0
+    file: "2360.wav"
+    sha256: 01fad26ad8e1897072fe4cf87de364a5f8be125fefd2f91b495655b310ec871c
+    durationS: 4.39
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Used: gate (placing the fence). Single clean slam with a long ring."
+
+  - id: bsb-2358
+    library: BigSoundBank
+    title: "Metal barrier: Closure #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/grinding-metal-barrier-closure-1-s2358.html
+    license: CC0-1.0
+    file: "2358.wav"
+    sha256: ee9862b56ffb7a2ee323f1cd733184de1e7d4b42fc69c92de3f0871deebf51ac
+    durationS: 4.18
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: slam preceded by grinding."
+
+  - id: bsb-2359
+    library: BigSoundBank
+    title: "Metal Barrier: Closure #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/grinding-metal-barrier-closure-2-s2359.html
+    license: CC0-1.0
+    file: "2359.wav"
+    sha256: b362a0df65470433348b531701b1dd56557035074d437d3e8394461345e6d296
+    durationS: 4.08
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: slam preceded by grinding."
+
+  - id: bsb-2355
+    library: BigSoundBank
+    title: "Metal barrier: Opening #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/grinding-metal-barrier-opening-1-s2355.html
+    license: CC0-1.0
+    file: "2355.wav"
+    sha256: 1d2e0b7eb4f6e29fcf6c372dd0fac56067f604fa02ad7ce1887652bdd7c61c1d
+    durationS: 2.53
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used: barrier opening (grinding)."
+
+  - id: bsb-0146
+    library: BigSoundBank
+    title: "Strong Wind #1"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/strong-wind-1-s0146.html
+    license: CC0-1.0
+    file: "0146.wav"
+    sha256: 9b62b250ca33821b2f26b1f16f48cef813a9646f476f2c4854766fa25928b808
+    durationS: 78.55
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used yet: wind ambience, a candidate for a future site ambience."
+
+  - id: bsb-0155
+    library: BigSoundBank
+    title: "Whistling of the Wind #2"
+    author: "Joseph Sardin"
+    page: https://bigsoundbank.com/whistling-of-the-wind-2-s0155.html
+    license: CC0-1.0
+    file: "0155.wav"
+    sha256: 1de928c282f3c306b93b167c184ab7d2df32ebf88aae3387c60bb2d9c6e3f0f8
+    durationS: 43.24
+    mainsHz: null
+    mainsEvidence: no mains harmonic comb (isolated peaks are mechanical resonances)
+    verdict: "Not used yet: wind ambience, a candidate for a future site ambience."

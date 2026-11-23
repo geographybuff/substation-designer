@@ -17,11 +17,16 @@
  *   blades seating into contacts.
  *
  * Every renderer returns a mono Float32Array at the given sample rate and is
- * deterministic for its seed.
+ * deterministic for its seed. Levels are set by loudness, not peak: each sound is normalized to its
+ * category's maximum momentary loudness (BS.1770), the same scale as the recorded clips
+ * (assets/audio/recordings.yml), with small bounded offsets (a bigger transformer or arc is a few
+ * LU louder), so no sound makes the player reach for the volume.
  */
 import { voltageClassFor } from '../data/bulletin/voltageClasses';
 import type { ItemKind, PropValue } from '../engine/types';
-import { biquad, decay, envelope, mixInto, noise, normalize, rng, softClip, yardEcho } from './dsp';
+import { biquad, decay, envelope, mixInto, noise, rng, softClip, yardEcho } from './dsp';
+import { normalizeLoudness } from './loudness.mjs';
+import { LOUDNESS, type LoudnessCategory } from './samples';
 
 /** North American system frequency (all campaign sites are US cooperatives). */
 export const SYSTEM_HZ = 60;
@@ -112,6 +117,13 @@ function corona(n: number, sr: number, rnd: () => number, kv: number): Float32Ar
 
 /** Relative level (linear) of a sound in dB below full scale. */
 const dB = (d: number) => 10 ** (d / 20);
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Normalize to a loudness category (offset by `offsetDb` LU) with the shared peak ceiling. */
+function level(x: Float32Array, sr: number, category: LoudnessCategory, offsetDb = 0): Float32Array {
+  normalizeLoudness(x, sr, LOUDNESS.categories[category] + offsetDb, LOUDNESS.peakCeilingDb);
+  return x;
+}
 
 export interface EquipmentVoice {
   kind: ItemKind;
@@ -119,9 +131,68 @@ export interface EquipmentVoice {
   props?: Record<string, PropValue>;
 }
 
-/** Transformer hum level: about +6 dB per decade of kVA (a game simplification of NEMA TR-1 levels). */
-export function transformerHumDb(kva: number): number {
-  return -22 + 6 * Math.log10(Math.max(50, kva) / 10_000);
+/**
+ * Transformer hum level relative to the equipment category: bigger transformers are louder (NEMA TR-1
+ * levels rise about 6 dB per decade of kVA), compressed to 2 LU per decade and at most ±2 LU so a
+ * small station service unit and a 30 MVA unit stay comfortable at one volume setting.
+ */
+export function transformerOffsetDb(kva: number): number {
+  return clamp(2 * Math.log10(Math.max(50, kva) / 10_000), -2, 2);
+}
+
+/** Loudness offset (LU) of a component's placement sound within the equipment category. */
+export function equipmentOffsetDb(v: EquipmentVoice): number {
+  const kv = v.kv > 0 ? v.kv : 12.47;
+  switch (v.kind) {
+    case 'transformer':
+      return transformerOffsetDb(Number(v.props?.kva ?? 10_000));
+    case 'arrester':
+    case 'wave_trap':
+    case 'metering':
+      return -5;
+    case 'station_service':
+    case 'vt':
+    case 'ccvt':
+      return -4;
+    case 'capacitor_bank':
+    case 'control_house':
+      return -3;
+    case 'mobile_pad':
+    case 'mast':
+      return -2;
+    case 'regulator':
+      return -1;
+    case 'line_terminal':
+    case 'feeder_exit':
+      return kv >= 100 ? -1 : -5;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * When the main mechanical event of a placement sound happens (s): the breaker closing, the
+ * recloser's clack, the switch blades seating. Recorded clips are aligned on it.
+ */
+export function equipmentHitS(kind: ItemKind, kv: number): number | undefined {
+  const size = Math.min(1, Math.max(0, Math.log10((kv > 0 ? kv : 12.47) / 12) / Math.log10(20)));
+  switch (kind) {
+    case 'regulator':
+      return 1.02;
+    case 'breaker':
+    case 'circuit_switcher':
+      return 1.15;
+    case 'recloser':
+      return 0.12;
+    case 'switch':
+      return 0.75 + 0.3 * size;
+    case 'hookstick_switch':
+      return 0.1;
+    case 'fuse':
+      return 0.08;
+    default:
+      return undefined;
+  }
 }
 
 function transformerHum(sr: number, rnd: () => number, kva: number, dur: number, fans: boolean): Float32Array {
@@ -154,19 +225,20 @@ export function renderEquipment(v: EquipmentVoice, sr: number, seed = 1): Float3
   const size = Math.min(1, Math.max(0, Math.log10(kv / 12) / Math.log10(20)));
   const out = new Float32Array(secs(sr, 2));
   const at = (s: number) => s * sr;
+  const hit = equipmentHitS(v.kind, kv);
   switch (v.kind) {
     case 'transformer':
     case 'mobile_pad': {
       const kva = Number(p.kva ?? (v.kind === 'mobile_pad' ? 0 : 10_000));
       if (v.kind === 'mobile_pad') {
         mixInto(out, strike(sr, rnd, { pitch: 70, ring: 0.12, thud: 0.8, bright: 0.3 }), 0, 0.5);
-        return normalize(out, dB(-12));
+        return level(out, sr, 'equipment', equipmentOffsetDb(v));
       }
       const fans = String(p.cooling ?? '').includes('FA');
       const h = envelope(transformerHum(sr, rnd, kva, 2, fans), sr, 0.35, 0.45);
       mixInto(out, h);
       if (p.ltc) mixInto(out, motor(sr, rnd, 0.5, 80, 110), at(0.8), 0.25);
-      return normalize(out, dB(transformerHumDb(kva) + 14));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'station_service':
     case 'vt':
@@ -174,67 +246,67 @@ export function renderEquipment(v: EquipmentVoice, sr: number, seed = 1): Float3
     case 'capacitor_bank': {
       const h = envelope(hum(out.length, sr, HUM_HZ, v.kind === 'capacitor_bank' ? [0.6, 0.5, 0.45, 0.3] : [1, 0.7, 0.45, 0.3, 0.2], rnd), sr, 0.25, 0.4);
       mixInto(out, h);
-      return normalize(out, dB(v.kind === 'capacitor_bank' ? -20 : -24));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'regulator': {
       mixInto(out, envelope(hum(out.length, sr, HUM_HZ, [1, 0.6, 0.35, 0.2], rnd), sr, 0.3, 0.4), 0, 0.5);
       // A tap change: motor, then the selector switch clacks over.
       mixInto(out, motor(sr, rnd, 0.45, 70, 95), at(0.55), 0.35);
-      mixInto(out, strike(sr, rnd, { pitch: 420, ring: 0.05, thud: 0.4 }), at(1.02), 0.6);
-      return normalize(out, dB(-12));
+      mixInto(out, strike(sr, rnd, { pitch: 420, ring: 0.05, thud: 0.4 }), at(hit!), 0.6);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'breaker':
     case 'circuit_switcher': {
       // Spring-charging (or motor operator) motor, then the mechanism closes with a heavy thunk.
       mixInto(out, motor(sr, rnd, 0.9, 95 - 25 * size, 150 - 30 * size), at(0.05), 0.35);
-      mixInto(out, strike(sr, rnd, { pitch: 150 - 60 * size, ring: 0.1 + 0.08 * size, thud: 1, partials: [1, 1.9, 3.7, 5.3] }), at(1.15), 1);
-      mixInto(out, strike(sr, rnd, { pitch: 900, ring: 0.03, bright: 0.8 }), at(1.18), 0.25);
-      return normalize(out, dB(-6));
+      mixInto(out, strike(sr, rnd, { pitch: 150 - 60 * size, ring: 0.1 + 0.08 * size, thud: 1, partials: [1, 1.9, 3.7, 5.3] }), at(hit!), 1);
+      mixInto(out, strike(sr, rnd, { pitch: 900, ring: 0.03, bright: 0.8 }), at(hit! + 0.03), 0.25);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'recloser': {
       // Magnetic actuator: a sharp clack, then the latch.
-      mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), at(0.12), 1);
-      mixInto(out, strike(sr, rnd, { pitch: 1400, ring: 0.02, bright: 1 }), at(0.2), 0.3);
-      return normalize(out, dB(-8));
+      mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), at(hit!), 1);
+      mixInto(out, strike(sr, rnd, { pitch: 1400, ring: 0.02, bright: 1 }), at(hit! + 0.08), 0.3);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'switch': {
       // Gang-operated disconnect: blades swing through the air and seat into the jaws.
       const swing = noise(secs(sr, 0.6 + 0.3 * size), rnd);
       biquad(swing, sr, 'bandpass', 700 - 300 * size, 1.2);
       mixInto(out, envelope(swing, sr, 0.3, 0.2), at(0.05), 0.12);
-      mixInto(out, strike(sr, rnd, { pitch: 520 - 260 * size, ring: 0.35 + 0.3 * size, partials: [1, 2.58, 4.75, 7.1], thud: 0.4 }), at(0.75 + 0.3 * size), 1);
-      return normalize(out, dB(-8));
+      mixInto(out, strike(sr, rnd, { pitch: 520 - 260 * size, ring: 0.35 + 0.3 * size, partials: [1, 2.58, 4.75, 7.1], thud: 0.4 }), at(hit!), 1);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'hookstick_switch':
-      mixInto(out, strike(sr, rnd, { pitch: 760, ring: 0.22, partials: [1, 2.58, 4.75], bright: 0.8 }), at(0.1), 1);
-      return normalize(out, dB(-12));
+      mixInto(out, strike(sr, rnd, { pitch: 760, ring: 0.22, partials: [1, 2.58, 4.75], bright: 0.8 }), at(hit!), 1);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     case 'fuse':
       // Fuse holder snapped into its clips.
-      mixInto(out, strike(sr, rnd, { pitch: 980, ring: 0.08, bright: 1 }), at(0.08), 1);
-      mixInto(out, strike(sr, rnd, { pitch: 1250, ring: 0.05, bright: 1 }), at(0.16), 0.6);
-      return normalize(out, dB(-14));
+      mixInto(out, strike(sr, rnd, { pitch: 980, ring: 0.08, bright: 1 }), at(hit!), 1);
+      mixInto(out, strike(sr, rnd, { pitch: 1250, ring: 0.05, bright: 1 }), at(hit! + 0.08), 0.6);
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     case 'arrester':
     case 'wave_trap':
     case 'metering':
       // Silent in service: only the mounting bolts going home.
       mixInto(out, strike(sr, rnd, { pitch: 610, ring: 0.05, bright: 0.7 }), at(0.05), 1);
-      return normalize(out, dB(-20));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     case 'control_house': {
       const f = noise(out.length, rnd);
       biquad(f, sr, 'lowpass', 700);
       mixInto(out, envelope(f, sr, 0.3, 0.4), 0, 0.4);
       mixInto(out, envelope(hum(out.length, sr, HUM_HZ, [0.4, 0.3, 0.25, 0.2, 0.15], rnd), sr, 0.3, 0.4), 0, 0.3);
-      return normalize(out, dB(-20));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
     case 'mast':
       mixInto(out, strike(sr, rnd, { pitch: 190, ring: 0.6, partials: [1, 2.76, 5.4, 8.9], thud: 0.5 }), at(0.05), 1);
-      return normalize(out, dB(-12));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     case 'line_terminal':
     case 'feeder_exit': {
       // An energized line: faint conductor hum, and corona at high voltage.
       mixInto(out, envelope(hum(out.length, sr, HUM_HZ, [0.3, 0.2, 0.1], rnd), sr, 0.3, 0.4), 0, 0.3);
       if (kv >= 100) mixInto(out, envelope(corona(out.length, sr, rnd, kv), sr, 0.3, 0.4), 0, 0.8);
-      return normalize(out, dB(kv >= 100 ? -16 : -26));
+      return level(out, sr, 'equipment', equipmentOffsetDb(v));
     }
   }
   return out;
@@ -251,26 +323,26 @@ export function renderUi(name: UiSound, sr: number, seed = 1, kv = 12.47): Float
       // Aluminum tube ringing as it is set on its supports; bigger tube for higher voltage.
       const big = Math.min(1, Math.max(0, Math.log10(kv / 12) / Math.log10(20)));
       mixInto(out, strike(sr, rnd, { pitch: 1250 - 500 * big, ring: 0.12, partials: [1, 2.76, 5.4], bright: 0.5 }), 0, 1);
-      return normalize(out, dB(-16));
+      return level(out, sr, 'ui');
     }
     case 'fence': {
       for (let k = 0; k < 7; k++) mixInto(out, strike(sr, rnd, { pitch: 1700 + rnd() * 900, ring: 0.03, bright: 1 }), (0.03 + k * 0.06 + rnd() * 0.03) * sr, 0.4 + rnd() * 0.4);
-      return normalize(out, dB(-18));
+      return level(out, sr, 'ui');
     }
     case 'erase': {
       const w = noise(out.length, rnd);
       biquad(w, sr, 'bandpass', 1500, 0.7);
       mixInto(out, envelope(w, sr, 0.05, 0.3), 0, 1);
-      return normalize(out, dB(-24));
+      return level(out, sr, 'ui', -2);
     }
     case 'blocked': {
       const b = hum(secs(sr, 0.22), sr, 110, [1, 0.5, 0.33], rnd, 0);
       mixInto(out, envelope(b, sr, 0.01, 0.06), 0, 1);
-      return normalize(out, dB(-20));
+      return level(out, sr, 'ui');
     }
     case 'click':
       mixInto(out, strike(sr, rnd, { pitch: 2200, ring: 0.01, bright: 1 }), 0, 1);
-      return normalize(out, dB(-22));
+      return level(out, sr, 'ui', -2);
   }
 }
 
@@ -336,20 +408,18 @@ const MAX_ARC_S = 1.4;
  * station the arc burns (and lengthens, dropping in pitch) until the remote end
  * clears it; a transformer internal fault ends with the tank rupturing.
  */
-export function renderArc(spec: ArcSpec, sr: number, seed = 1): { pcm: Float32Array; arcSeconds: number[] } {
+export function renderArc(spec: ArcSpec, sr: number, seed = 1): { pcm: Float32Array; arcSeconds: number[]; timeline: ArcTimeline } {
   const rnd = rng(seed);
   const P = arcPowerMW(spec);
   const loud = Math.min(1, 0.45 + 0.17 * Math.log10(P));
   const centre = 3000 / (1 + 0.45 * Math.log2(1 + P));
-  const tArc = Math.min(MAX_ARC_S, clearingSeconds(spec.clearing, spec.remoteS));
-  const shots = spec.clearing === 'recloser' ? [tArc, tArc * 1.6] : [tArc];
-  const openInterval = 0.55;
-  const total = 0.05 + shots.reduce((a, b) => a + b, 0) + (shots.length - 1) * openInterval + 1.1;
-  const out = new Float32Array(secs(sr, total));
+  const timeline = arcTimeline(spec);
+  const shots = timeline.shots.map((s) => s.dur);
+  const out = new Float32Array(secs(sr, timeline.total));
   const arcSeconds: number[] = [];
-  let t0 = 0.05;
   const phase0 = rnd();
   shots.forEach((dur, shot) => {
+    let t0 = timeline.shots[shot]!.t;
     arcSeconds.push(dur);
     const n = secs(sr, dur);
     // Pressure wave at ignition: an N-wave plus a low thump, bigger for bigger arcs.
@@ -390,7 +460,7 @@ export function renderArc(spec: ArcSpec, sr: number, seed = 1): { pcm: Float32Ar
       mixInto(out, pop, t0 * sr, loud * 0.9);
     } else if (spec.clearing === 'recloser') {
       mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), t0 * sr, 0.6);
-      if (!last) mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), (t0 + openInterval - 0.02) * sr, 0.5);
+      if (!last) mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), timeline.recloses[shot]! * sr, 0.5);
     } else if (spec.clearing === 'breaker' || spec.clearing === 'circuit_switcher') {
       mixInto(out, strike(sr, rnd, { pitch: 120, ring: 0.14, thud: 1, partials: [1, 1.9, 3.7, 5.3] }), t0 * sr, 0.7);
     }
@@ -402,11 +472,48 @@ export function renderArc(spec: ArcSpec, sr: number, seed = 1): { pcm: Float32Ar
       biquad(debris, sr, 'lowpass', 900);
       decay(debris, sr, 0.2);
       mixInto(boom, debris, 0, 0.8);
-      mixInto(out, boom, (t0 - 0.05) * sr, 1);
+      mixInto(out, boom, timeline.rupture! * sr, 1);
     }
-    t0 += last ? 0 : openInterval;
   });
-  return { pcm: normalize(softClip(yardEcho(out, sr, 0.3), 1.4), dB(-1 - 6 * (1 - loud))), arcSeconds };
+  return { pcm: level(softClip(yardEcho(out, sr, 0.3), 1.4), sr, 'fault', arcOffsetDb(spec)), arcSeconds, timeline };
+}
+
+/** When things happen in an arc fault (s): each arc shot, each trip, each reclose, a tank rupture. */
+export interface ArcTimeline {
+  shots: Array<{ t: number; dur: number }>;
+  /** When the clearing device interrupts (the end of each shot). */
+  trips: number[];
+  /** When a recloser closes back in (before the next shot). */
+  recloses: number[];
+  rupture?: number;
+  total: number;
+}
+
+/** Open interval of a recloser between tripping and reclosing (s), shortened for the game. */
+const OPEN_INTERVAL_S = 0.55;
+
+export function arcTimeline(spec: ArcSpec): ArcTimeline {
+  const tArc = Math.min(MAX_ARC_S, clearingSeconds(spec.clearing, spec.remoteS));
+  const durs = spec.clearing === 'recloser' ? [tArc, tArc * 1.6] : [tArc];
+  const tl: ArcTimeline = { shots: [], trips: [], recloses: [], total: 0 };
+  let t = 0.05;
+  durs.forEach((dur, i) => {
+    tl.shots.push({ t, dur });
+    t += dur;
+    tl.trips.push(t);
+    if (i < durs.length - 1) {
+      tl.recloses.push(t + OPEN_INTERVAL_S - 0.02);
+      t += OPEN_INTERVAL_S;
+    }
+  });
+  if (spec.kind === 'xfmr') tl.rupture = t - 0.05;
+  tl.total = t + 1.1;
+  return tl;
+}
+
+/** Loudness offset (LU) of an arc within the fault category: bigger arcs are louder, within -3..+2 LU. */
+export function arcOffsetDb(spec: Pick<ArcSpec, 'kv' | 'faultKA' | 'kind'>): number {
+  return clamp(3 * Math.log10(arcPowerMW(spec) / 5), -3, 2);
 }
 
 export interface EnergizeSpec {
@@ -422,15 +529,14 @@ export interface EnergizeSpec {
 /** Commissioning: the switches and breakers close one by one and the transformer hums up to full voice. */
 export function renderEnergize(spec: EnergizeSpec, sr: number, seed = 1): Float32Array {
   const rnd = rng(seed);
-  const out = new Float32Array(secs(sr, 3.6));
-  const closes = spec.closings.slice(0, 4);
-  closes.forEach((k, i) => {
-    const t = 0.1 + i * 0.32;
+  const tl = energizeTimeline(spec);
+  const out = new Float32Array(secs(sr, tl.total));
+  tl.closes.forEach(({ t, kind: k }) => {
     if (k === 'recloser') mixInto(out, strike(sr, rnd, { pitch: 320, ring: 0.06, thud: 0.6, partials: [1, 2.6, 5.1] }), t * sr, 0.55);
     else if (k === 'switch') mixInto(out, strike(sr, rnd, { pitch: 420, ring: 0.3, partials: [1, 2.58, 4.75, 7.1], thud: 0.3 }), t * sr, 0.45);
     else mixInto(out, strike(sr, rnd, { pitch: 130, ring: 0.12, thud: 1, partials: [1, 1.9, 3.7, 5.3] }), t * sr, 0.75);
   });
-  const t1 = 0.1 + Math.max(0, closes.length - 1) * 0.32 + 0.1;
+  const t1 = tl.humAt;
   const rest = out.length - Math.round(t1 * sr);
   if (spec.kva > 0 && rest > 0) {
     // Inrush: the hum swells in with a growl of extra harmonics that settles.
@@ -439,8 +545,14 @@ export function renderEnergize(spec: EnergizeSpec, sr: number, seed = 1): Float3
     for (let i = 0; i < growl.length; i++) growl[i]! *= Math.exp(-i / (0.5 * sr));
     mixInto(h, growl, 0, 0.8);
     envelope(h, sr, 0.25, 0.5);
-    mixInto(out, h, t1 * sr, dB(transformerHumDb(spec.kva) + 18));
+    mixInto(out, h, t1 * sr, 0.6 * dB(transformerOffsetDb(spec.kva)));
   }
   if (spec.kv >= 100 && rest > 0) mixInto(out, envelope(corona(rest, sr, rnd, spec.kv), sr, 0.3, 0.5), t1 * sr, 0.3);
-  return normalize(out, dB(-6));
+  return level(out, sr, 'energize');
+}
+
+/** When each switching device closes and when the hum starts (s). */
+export function energizeTimeline(spec: EnergizeSpec): { closes: Array<{ t: number; kind: EnergizeSpec['closings'][number] }>; humAt: number; total: number } {
+  const closes = spec.closings.slice(0, 4).map((kind, i) => ({ t: 0.1 + i * 0.32, kind }));
+  return { closes, humAt: 0.1 + Math.max(0, closes.length - 1) * 0.32 + 0.1, total: 3.6 };
 }

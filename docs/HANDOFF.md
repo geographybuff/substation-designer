@@ -44,15 +44,16 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
   folding at a jog < 2 × phase spacing) and `conn.sideentry` (bus entering a terminal from the side);
   `alignPlacement` snaps equipment into line while placing/dragging, `alignItemToBus` is the one-click fix.
   Dev: `view3d-harness.html?scenario=/tests/dev/scenarios.ts&v=<name>` renders junction variants or `sol:<levelId>`.
-- **Audio** (unreleased): `src/audio/`. `dsp.ts` (pure DSP: seeded noise, biquads, envelopes, Goertzel for tests),
-  `sounds.ts` (synthesized sounds rendered to Float32Array: equipment voices, editor sounds, `renderArc` with
-  120 Hz pulsing, arc power from Table 4-7 gap × fault kA, duration from the clearing device, `renderEnergize`),
-  `faults.ts` (which critical finding becomes an arc, at which node voltage and fault kA, cleared by which
-  device: the most selective protective device whose opening de-energizes the node), `player.ts` (Web Audio,
-  cached AudioBuffers, `sfx.placed/ui/energize`, settings via `configureAudio`), `samples.ts` (optional
-  recorded samples in `assets/audio/`, inlined by `import.meta.glob`; licences enforced by
-  `tests/audio.test.ts`; sourcing notes in `assets/audio/README.md`). No samples are committed yet: the
-  sound libraries' bot policies rule out automated downloads, so samples are added by hand.
+- **Audio** (unreleased): `src/audio/`. `dsp.ts` (pure DSP), `loudness.mjs` (+ `.d.mts`; BS.1770 momentary
+  loudness, limiter, `normalizeLoudness`; plain JS shared with the build script), `sounds.ts` (synthesized sounds
+  normalized per loudness category with bounded offsets; `equipmentHitS`, `arcTimeline`, `energizeTimeline` give
+  event times), `faults.ts` (which critical finding becomes an arc, node voltage, fault kA, clearing device),
+  `player.ts` (Web Audio; layers recorded clips aligned on each event with power-complementary gains `LAYER`),
+  `samples.ts` (reads `assets/audio/sounds.json`). Recorded clips: `assets/audio/recordings.yml` is the source of
+  truth (43 recordings from the user's Drive download, measured native mains frequency, verdicts, slots with
+  candidates), `scripts/build-audio.mjs <download-folder> [--system-hz 50|60]` builds `<slot>.ogg` + `sounds.json`
+  (deterministic; prefers native-frequency candidates, converts others), rules in `scripts/audio-manifest.mjs`.
+  The original downloads are not in the repo; see `assets/audio/README.md`.
 - **Desktop/release**: `electron/main.cjs` + `preload.cjs`, `electron-builder.yml` (NSIS with license page,
   portable, zip), `scripts/` (icon, prepare-build, verify-release, release-notes), `.github/workflows/`
   (`ci.yml`; `tag-release.yml`, run by hand, which calls `release.yml`; `release.yml` also runs on a pushed `v*` tag).

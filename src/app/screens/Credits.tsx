@@ -36,18 +36,20 @@ export function Credits() {
           <h3>Sound</h3>
           <p class="muted">
             Equipment hum, switchgear and arcing faults are synthesized in the game from the physics of each sound: transformer hum at twice the 60 Hz system
-            frequency, arcs that pulse at every current zero and last as long as the protective device takes to clear them.
+            frequency, arcs that pulse at every current zero and last as long as the protective device takes to clear them. Recordings are layered over them:
           </p>
-          {AUDIO_CREDITS.length > 0 && (
-            <ul class="small">
-              {AUDIO_CREDITS.map((c) => (
-                <li key={c.file}>
-                  “{c.title}” by {c.author} ({c.source}), {c.license}
-                  {c.modified ? `; ${c.modified}` : ''}. Not covered by the game's license.
-                </li>
-              ))}
-            </ul>
-          )}
+          <ul class="small audio-credits">
+            {AUDIO_CREDITS.map((c) => (
+              <li key={c.id}>
+                “
+                <a href={c.page} target="_blank" rel="noopener noreferrer">
+                  {c.title}
+                </a>
+                ” by {c.author} ({c.library}), {c.license === 'CC0-1.0' ? 'CC0 (public domain)' : c.license.replace(/-(\d)/, ' $1')}. {c.modified}.
+              </li>
+            ))}
+          </ul>
+          <p class="muted small">The recordings are not covered by the game's license; each keeps its own.</p>
         </div>
         <div class="card">
           <h3>{LICENSE_NAME}</h3>
