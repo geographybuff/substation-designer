@@ -13,7 +13,7 @@ import { FINDING_HELP, OBJECTIVE_HELP } from './helpEntries';
 export type HelpTool = ItemKind | 'bus' | 'highbus' | 'fence' | 'shieldwire';
 export type HelpOverlay = 'shielding' | 'fenceZone' | 'grounding' | 'removal';
 /** Small one-line diagrams drawn by the UI (see HelpDiagram.tsx). */
-export type HelpDiagramId = 'feeder-bay' | 'recloser-bypass' | 'regulator-bypass' | 'xfmr-primary' | 'arresters' | 'straight-entry' | 'tap' | 'mobile-pad' | 'sectionalized-bus';
+export type HelpDiagramId = 'feeder-bay' | 'recloser-bypass' | 'regulator-bypass' | 'bus-regulation' | 'xfmr-primary' | 'arresters' | 'straight-entry' | 'tap' | 'mobile-pad' | 'sectionalized-bus';
 
 export interface HelpFix {
   /** Button text, e.g. "Line R1 up with its bus". */

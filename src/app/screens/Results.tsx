@@ -1,3 +1,4 @@
+import { sfx } from '../../audio/player';
 import { CAMPAIGN, getLevel } from '../../levels';
 import type { SimulationResult } from '../../engine/simulation';
 import { CiteLink, money } from '../components/Inspector';
@@ -43,6 +44,7 @@ function LoadChart({ sim }: { sim: SimulationResult }) {
 
 export function Results() {
   const res = useStore(store, (s) => s.lastResult);
+  const game = useStore(store, (s) => s.game);
   if (!res) {
     go('menu');
     return null;
@@ -71,12 +73,30 @@ export function Results() {
               {level.sandbox ? 'Sandbox run complete' : review.passed ? 'Commissioned — the cooperative accepts your substation' : 'Not approved'}
             </div>
             {!review.passed && !level.sandbox && <div class="muted">Blocking: {review.blockers.join(', ')}.</div>}
+            {res.fault && (
+              <div class="fault-caption" data-testid="fault-caption">
+                <b>What you heard:</b> {res.fault.caption}
+              </div>
+            )}
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: '.5em', flexWrap: 'wrap' }}>
             {review.passed && next && (
               <button class="btn primary" onClick={() => startLevel(next.id)} data-testid="results-next">
                 Next project: {next.title} →
+              </button>
+            )}
+            {game.sound && (
+              <button
+                class="btn"
+                onClick={() => {
+                  const d = store.get().design;
+                  if (d) sfx.energize(d, level, review);
+                }}
+                title="Play the energizing sound again"
+                data-testid="results-replay"
+              >
+                ▶ Replay sound
               </button>
             )}
             <button class="btn" onClick={() => go('levels')}>

@@ -1300,7 +1300,7 @@ export const OBJECTIVE_HELP: Partial<Record<ObjectiveKind, ObjectiveHelpFn>> = {
       ),
       tool: pickTool(level, 'regulator'),
       side: 'lv',
-      diagram: 'regulator-bypass',
+      diagram: 'bus-regulation',
       guide: 'voltage-regulation',
       itemIds: unreg.map((i) => i.id),
     };

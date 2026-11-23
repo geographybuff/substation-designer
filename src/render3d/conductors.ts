@@ -406,6 +406,220 @@ function busSupport(p: Parts, pts3: readonly Vec2[], h: number, kv: number): voi
   }
 }
 
+/** A planned bus support: which run carries it, where along the run (m), and the three phase points it holds. */
+export interface SupportPlan {
+  chain: number;
+  s: number;
+  owner: string;
+  pts3: Vec2[];
+}
+
+/** Where a bus support may not stand: within `d` of run coordinate `s` (a junction with another run). */
+export interface KeepOut {
+  s: number;
+  d: number;
+}
+
+/** How far supports stand from a junction: clear of the other run's outer phase, the same on both sides. */
+export const junctionClearance = (otherSp: number) => 1.5 * otherSp + 0.6;
+/** A bus ending at a device terminal is held by a support this far back from the end; the jumpers hang from the end. */
+export const PORT_INSET = 0.5;
+/** An end support closer than this to a stronger support gives way to it. */
+export const MIN_GAP = 1;
+/** Two end supports closer than this become one post in the middle (a bus of up to about 3 m between two devices). */
+const END_PAIR_GAP = 2;
+
+function cumLengths(pts: readonly Vec2[]): number[] {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1]! + Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y));
+  return cum;
+}
+
+/** Run coordinate of the point of `pts` nearest J. */
+function runCoord(pts: readonly Vec2[], cum: readonly number[], J: Vec2): number {
+  let best = 0;
+  let bd = Infinity;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const dd = pointSegDist(J, pts[i]!, pts[i + 1]!);
+    if (dd < bd - 1e-9) {
+      bd = dd;
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const L = cum[i + 1]! - cum[i]!;
+      const t = L < 1e-9 ? 0 : Math.max(0, Math.min(1, ((J.x - a.x) * (b.x - a.x) + (J.y - a.y) * (b.y - a.y)) / (L * L)));
+      best = cum[i]! + t * L;
+    }
+  }
+  return best;
+}
+
+/** The run (other than `self`) whose centreline passes through J. */
+function runThrough(chains: readonly Chain[], self: number, J: Vec2): number {
+  return chains.findIndex((m, mi) => mi !== self && m.pts.some((_, i) => i + 1 < m.pts.length && pointSegDist(J, m.pts[i]!, m.pts[i + 1]!) <= EPS));
+}
+
+/**
+ * Junction keep-out zones per run, by run coordinate: `through` for junctions on the run's interior
+ * (another run taps it or crosses beneath it there), `start`/`end` for the clearance at an end that taps
+ * another run, and `all` for both together. Exported for tests.
+ */
+export function junctionZones(chains: readonly Chain[]): Array<{ through: KeepOut[]; start?: number; end?: number; all: KeepOut[] }> {
+  const zones: Array<{ through: KeepOut[]; start?: number; end?: number; all: KeepOut[] }> = chains.map(() => ({ through: [], all: [] }));
+  const cums = chains.map((ch) => cumLengths(ch.pts));
+  chains.forEach((ch, idx) => {
+    for (const J of ch.crossings) {
+      const mi = runThrough(chains, idx, J);
+      if (mi < 0) continue;
+      zones[idx]!.through.push({ s: runCoord(ch.pts, cums[idx]!, J), d: junctionClearance(chains[mi]!.sp) });
+      zones[mi]!.through.push({ s: runCoord(chains[mi]!.pts, cums[mi]!, J), d: junctionClearance(ch.sp) });
+    }
+    for (const which of ['start', 'end'] as const) {
+      const k = ch[which];
+      if (k.t !== 'tee') continue;
+      const mi = runThrough(chains, idx, k.at);
+      if (mi < 0) continue;
+      zones[idx]![which] = junctionClearance(chains[mi]!.sp);
+      zones[mi]!.through.push({ s: runCoord(chains[mi]!.pts, cums[mi]!, k.at), d: junctionClearance(ch.sp) });
+    }
+  });
+  zones.forEach((z, idx) => {
+    const cum = cums[idx]!;
+    const L = cum[cum.length - 1] ?? 0;
+    z.all = [...z.through, ...(z.start !== undefined ? [{ s: 0, d: z.start }] : []), ...(z.end !== undefined ? [{ s: L, d: z.end }] : [])];
+  });
+  return zones;
+}
+
+/**
+ * Bus supports for every run, as a structural engineer would place them:
+ * - at every corner and every free end;
+ * - just behind every end that lands on a device terminal (the flexible jumpers hang from the end),
+ *   so no bus between two pieces of equipment is left floating however short it is;
+ * - on both sides of every junction at the same distance, on the run above and on the run that taps or
+ *   crosses beneath it, so the posts frame the junction symmetrically and clear the other run's phases;
+ * - then evenly in between so no span exceeds MAX_SPAN.
+ * Pure: exported for tests.
+ */
+export function planSupports(chains: readonly Chain[], phases?: readonly Vec2[][][]): SupportPlan[] {
+  const zones = junctionZones(chains);
+  const cums = chains.map((ch) => cumLengths(ch.pts));
+  const out: SupportPlan[] = [];
+  chains.forEach((ch, idx) => {
+    const pts = ch.pts;
+    const n = pts.length;
+    const cum = cums[idx]!;
+    const L = cum[n - 1]!;
+    if (n < 2 || L < 1e-6) return;
+    const { through, start: ekStart, end: ekEnd, all: ko } = zones[idx]!;
+    const inKeepOut = (s: number) => ko.some((k) => Math.abs(s - k.s) < k.d - 1e-6);
+
+    // Candidates: prio 3 = corner or free end (always kept), 2 = junction pair, 1 = behind a device terminal.
+    type Cand = { s: number; prio: number; vi?: number };
+    const cands: Cand[] = [];
+    for (let i = 0; i < n; i++) {
+      if (!ch.closed && (i === 0 || i === n - 1)) {
+        const kind = i === 0 ? ch.start : ch.end;
+        if (kind.t === 'free') cands.push({ s: cum[i]!, prio: 3, vi: i });
+        else if (kind.t === 'port') cands.push({ s: i === 0 ? Math.min(PORT_INSET, L / 2) : Math.max(L - PORT_INSET, L / 2), prio: 1 });
+        continue;
+      }
+      if (ch.closed && i === n - 1) continue;
+      const a = pts[i === 0 ? n - 2 : i - 1]!;
+      const b = pts[i]!;
+      const c = pts[i + 1]!;
+      const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      if (Math.abs(cross) <= 1e-3) continue;
+      // A junction right at the corner: the pair of junction supports replaces the corner support.
+      if (ko.some((k) => Math.abs(k.s - cum[i]!) < 0.05)) continue;
+      cands.push({ s: cum[i]!, prio: 3, vi: i });
+    }
+    const wrap = (s: number) => (ch.closed ? ((s % L) + L) % L : s);
+    for (const k of through) {
+      for (const s of [k.s - k.d, k.s + k.d]) {
+        if (ch.closed || (s > 0.05 && s < L - 0.05)) cands.push({ s: wrap(s), prio: 2 });
+      }
+    }
+    if (ekStart !== undefined && ekStart < L - 0.05) cands.push({ s: ekStart, prio: 2 });
+    if (ekEnd !== undefined && L - ekEnd > 0.05) cands.push({ s: L - ekEnd, prio: 2 });
+
+    let sup = cands.filter((c) => c.prio === 3 || !inKeepOut(c.s)).sort((a, b) => a.s - b.s);
+    // Merge near-duplicates: identical spots always; end supports give way to stronger neighbours,
+    // and two end supports on a short bus become one in the middle.
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (let i = 0; i + 1 < sup.length; i++) {
+        const a = sup[i]!;
+        const b = sup[i + 1]!;
+        const gap = b.s - a.s;
+        const limit = a.prio === 1 && b.prio === 1 ? END_PAIR_GAP : a.prio > 1 && b.prio > 1 ? 0.3 : MIN_GAP;
+        if (gap >= limit) continue;
+        let keep: Cand;
+        if (a.prio !== b.prio) keep = a.prio > b.prio ? a : b;
+        else if (a.prio === 1 && !inKeepOut((a.s + b.s) / 2)) keep = { s: (a.s + b.s) / 2, prio: 1 };
+        else keep = a;
+        sup.splice(i, 2, keep);
+        changed = true;
+        break;
+      }
+    }
+    // Nothing could stand clear of the junctions: a bus with a device at one end still needs a support,
+    // so put it behind that terminal. (A short link between two runs is carried by its risers.)
+    if (!sup.length) {
+      if (ch.start.t === 'port') sup.push({ s: Math.min(PORT_INSET, L / 2), prio: 1 });
+      else if (ch.end.t === 'port') sup.push({ s: Math.max(L - PORT_INSET, L / 2), prio: 1 });
+      else if (!(ch.start.t === 'tee' && ch.end.t === 'tee')) sup.push({ s: L / 2, prio: 1 });
+    }
+
+    // Fill long spans evenly; a point that lands in a junction keep-out moves to its edge.
+    const filled: Cand[] = [...sup];
+    const gaps: Array<[number, number]> = [];
+    for (let i = 0; i + 1 < sup.length; i++) gaps.push([sup[i]!.s, sup[i + 1]!.s]);
+    if (ch.closed && sup.length) gaps.push([sup[sup.length - 1]!.s, sup[0]!.s + L]);
+    for (const [a, b] of gaps) {
+      const gap = b - a;
+      const k = Math.ceil(gap / MAX_SPAN - 1e-6);
+      for (let j = 1; j < k; j++) {
+        let s = a + (gap * j) / k;
+        const hit = ko.find((q) => Math.abs(wrap(s) - q.s) < q.d - 1e-6);
+        if (hit) {
+          const lo = hit.s - hit.d;
+          const hi = hit.s + hit.d;
+          const sw = wrap(s);
+          s = s + ((sw - lo < hi - sw ? lo : hi) - sw);
+          if (s <= a + 0.5 || s >= b - 0.5 || inKeepOut(wrap(s))) continue;
+        }
+        filled.push({ s: wrap(s), prio: 0 });
+      }
+    }
+
+    const ph = phases?.[idx];
+    for (const c of filled.sort((a, b) => a.s - b.s)) {
+      // Corners use the mitred phase points; elsewhere the phases sit square to the run.
+      let vi = c.vi;
+      if (vi === undefined) {
+        const at = cum.findIndex((q) => Math.abs(q - c.s) < 1e-6);
+        if (at >= 0) vi = at === n - 1 && ch.closed ? 0 : at;
+      }
+      let si = 0;
+      while (si + 2 < n && cum[si + 1]! <= c.s) si++;
+      const owner = ch.owners[Math.min(si, ch.owners.length - 1)]!;
+      if (vi !== undefined && ph) {
+        out.push({ chain: idx, s: c.s, owner, pts3: [ph[0]![vi]!, ph[1]![vi]!, ph[2]![vi]!] });
+        continue;
+      }
+      const a = pts[si]!;
+      const b = pts[si + 1]!;
+      const segL = cum[si + 1]! - cum[si]! || 1;
+      const t = (c.s - cum[si]!) / segL;
+      const d = unit(b.x - a.x, b.y - a.y);
+      const cx = a.x + (b.x - a.x) * t;
+      const cy = a.y + (b.y - a.y) * t;
+      out.push({ chain: idx, s: c.s, owner, pts3: [-1, 0, 1].map((k) => ({ x: cx - d.y * k * ch.sp, y: cy + d.x * k * ch.sp })) });
+    }
+  });
+  return out;
+}
+
 export interface ConductorResult {
   hasLive: boolean;
 }
@@ -509,26 +723,7 @@ export function buildConductors(p: Parts, batch: PartBatch, model: SceneModel, p
     }
   });
 
-  // Junctions on each run (where another run taps or crosses beneath): bus supports keep clear of them.
-  const junctions: Vec2[][] = chains.map(() => []);
-  chains.forEach((ch, idx) => {
-    const at = [...ch.crossings];
-    for (const k of [ch.start, ch.end]) if (k.t === 'tee') at.push(k.at);
-    for (const J of at) {
-      chains.forEach((m, mi) => {
-        if (mi === idx) return;
-        for (let i = 0; i + 1 < m.pts.length; i++) {
-          if (pointSegDist(J, m.pts[i]!, m.pts[i + 1]!) <= EPS) {
-            junctions[mi]!.push(J);
-            return;
-          }
-        }
-      });
-    }
-  });
-
   let hasLive = false;
-  const supportKeys = new Set<string>();
   chains.forEach((ch, idx) => {
     const h = ch.height - ch.drop;
     const r = pipeRadius(ch.kv);
@@ -558,80 +753,20 @@ export function buildConductors(p: Parts, batch: PartBatch, model: SceneModel, p
         jumpers(ctx, [ph[0]![ix]!, ph[1]![ix]!, ph[2]![ix]!], h, port);
       }
     }
-    // Bus supports: corners, free ends and at most MAX_SPAN apart in between.
-    const cum: number[] = [0];
-    for (let i = 1; i < n; i++) cum.push(cum[i - 1]! + Math.hypot(ch.pts[i]!.x - ch.pts[i - 1]!.x, ch.pts[i]!.y - ch.pts[i - 1]!.y));
-    const anchors: Array<{ s: number; vi: number; support: boolean }> = [];
-    for (let i = 0; i < n; i++) {
-      const isEnd = !ch.closed && (i === 0 || i === n - 1);
-      if (isEnd) {
-        const kind = i === 0 ? ch.start : ch.end;
-        anchors.push({ s: cum[i]!, vi: i, support: kind.t === 'free' });
-        continue;
-      }
-      if (ch.closed && i === n - 1) continue;
-      const a = ch.pts[i === 0 ? n - 2 : i - 1]!;
-      const b = ch.pts[i]!;
-      const c = ch.pts[i + 1]!;
-      const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-      if (Math.abs(cross) > 1e-3) anchors.push({ s: cum[i]!, vi: i, support: true });
-    }
-    if (ch.closed) anchors.push({ s: cum[n - 1]!, vi: n - 1, support: false });
-    own(ctx, ch.owners[0]!);
-    const place = (pts3: Vec2[]) => {
-      const c = pts3[1]!;
-      const k = `${Math.round(c.x * 4)},${Math.round(c.y * 4)},${Math.round(h * 10)}`;
-      if (supportKeys.has(k)) return;
-      supportKeys.add(k);
-      busSupport(p, pts3, h, ch.kv);
-    };
-    for (const an of anchors) if (an.support) place([ph[0]![an.vi]!, ph[1]![an.vi]!, ph[2]![an.vi]!]);
-    // Run coordinate of each junction on this run, and how far supports must stay from it.
-    const keep = 1.5 * ch.sp + 0.6;
-    const js = junctions[idx]!.map((J) => {
-      let best = 0;
-      let bd = Infinity;
-      for (let i = 0; i + 1 < n; i++) {
-        const a = ch.pts[i]!;
-        const b = ch.pts[i + 1]!;
-        const dd = pointSegDist(J, a, b);
-        if (dd < bd) {
-          bd = dd;
-          best = cum[i]! + Math.hypot(J.x - a.x, J.y - a.y);
-        }
-      }
-      return best;
-    });
-    for (let ai = 0; ai + 1 < anchors.length; ai++) {
-      const s0 = anchors[ai]!.s;
-      const s1 = anchors[ai + 1]!.s;
-      const L = s1 - s0;
-      const extra = Math.ceil(L / MAX_SPAN - 1e-6) - 1;
-      for (let j = 1; j <= extra; j++) {
-        let s = s0 + (L * j) / (extra + 1);
-        const sj = js.find((q) => Math.abs(q - s) < keep);
-        if (sj !== undefined) {
-          const lo = sj - keep;
-          const hi = sj + keep;
-          s = s - lo < hi - s && lo > s0 + 0.5 ? lo : hi < s1 - 0.5 ? hi : lo > s0 + 0.5 ? lo : NaN;
-          if (!Number.isFinite(s) || js.some((q) => Math.abs(q - s) < keep - 1e-6)) continue;
-        }
-        let si = 0;
-        while (si + 2 < n && cum[si + 1]! < s) si++;
-        const a = ch.pts[si]!;
-        const b = ch.pts[si + 1]!;
-        const segL = cum[si + 1]! - cum[si]! || 1;
-        const t = (s - cum[si]!) / segL;
-        const cx = a.x + (b.x - a.x) * t;
-        const cy = a.y + (b.y - a.y) * t;
-        const d = unit(b.x - a.x, b.y - a.y);
-        const nx = -d.y;
-        const ny = d.x;
-        own(ctx, ch.owners[si]!);
-        place([-1, 0, 1].map((k) => ({ x: cx + nx * k * ch.sp, y: cy + ny * k * ch.sp })));
-      }
-    }
   });
+
+  // Bus supports (see planSupports). Runs sharing a support position at the same height share one structure.
+  const supportKeys = new Set<string>();
+  for (const sp of planSupports(chains, phases)) {
+    const ch = chains[sp.chain]!;
+    const h = ch.height - ch.drop;
+    const c = sp.pts3[1]!;
+    const k = `${Math.round(c.x * 4)},${Math.round(c.y * 4)},${Math.round(h * 10)}`;
+    if (supportKeys.has(k)) continue;
+    supportKeys.add(k);
+    own(ctx, sp.owner);
+    busSupport(p, sp.pts3, h, ch.kv);
+  }
 
   for (const rz of risers) {
     own(ctx, rz.owner);

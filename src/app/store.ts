@@ -6,6 +6,7 @@ import type { Design, ItemKind, LevelDef } from '../engine/types';
 import { DEFAULT_GRAPHICS, type GraphicsSettings } from '../settings/graphics';
 import { getLevel } from '../levels';
 import { load, save } from './persist';
+import { configureAudio } from '../audio/player';
 
 type Listener = () => void;
 
@@ -68,6 +69,10 @@ export interface LevelProgress {
 export interface GameSettings {
   units: 'metric' | 'imperial';
   showTips: boolean;
+  /** Equipment and fault sounds. */
+  sound: boolean;
+  /** Master volume, 0..1. */
+  volume: number;
 }
 
 export interface AppState {
@@ -88,7 +93,7 @@ export interface AppState {
   game: GameSettings;
   showBriefing: boolean;
   tutorialStep: number;
-  lastResult: { review: DesignReview; levelId: string; sim: import('../engine/simulation').SimulationResult } | null;
+  lastResult: { review: DesignReview; levelId: string; sim: import('../engine/simulation').SimulationResult; fault?: import('../audio/faults').FaultScenario | null } | null;
   guideTopic: string | null;
   toast: { text: string; tone: 'info' | 'warn' | 'error'; at: number } | null;
 }
@@ -110,7 +115,7 @@ export const store = new Store<AppState>({
   reviewStale: true,
   progress: load<Record<string, LevelProgress>>('progress', {}),
   graphics: initialGraphics,
-  game: { units: 'metric', showTips: true, ...load<Partial<GameSettings>>('game', {}) },
+  game: { units: 'metric', showTips: true, sound: true, volume: 0.7, ...load<Partial<GameSettings>>('game', {}) },
   showBriefing: false,
   tutorialStep: 0,
   lastResult: null,
@@ -238,7 +243,10 @@ export function setGraphics(g: GraphicsSettings): void {
 export function setGame(g: GameSettings): void {
   store.set({ game: g });
   save('game', g);
+  configureAudio({ enabled: g.sound, volume: g.volume });
 }
+
+configureAudio({ enabled: store.get().game.sound, volume: store.get().game.volume });
 
 export function toast(text: string, tone: 'info' | 'warn' | 'error' = 'info'): void {
   store.set({ toast: { text, tone, at: Date.now() } });

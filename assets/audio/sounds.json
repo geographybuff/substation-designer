@@ -1,0 +1,333 @@
+{
+  "generatedBy": "scripts/build-audio.mjs from assets/audio/recordings.yml",
+  "systemHz": 60,
+  "loudness": {
+    "categories": {
+      "ui": -28,
+      "equipment": -23,
+      "energize": -21,
+      "fault": -17
+    },
+    "peakCeilingDb": -1.5
+  },
+  "slots": {
+    "transformer-hum": {
+      "file": "transformer-hum.ogg",
+      "category": "equipment",
+      "recording": "bsb-2437",
+      "clip": {
+        "start": 3.5,
+        "end": 7
+      },
+      "mainsHz": 50,
+      "followsMains": true,
+      "converted": {
+        "fromHz": 50,
+        "toHz": 60,
+        "factor": 1.2
+      },
+      "durationS": 2.917,
+      "hitS": 1.812,
+      "loudnessLufs": -23,
+      "peakDb": -14.8,
+      "limited": false
+    },
+    "corona": {
+      "file": "corona.ogg",
+      "category": "equipment",
+      "recording": "fs-809439",
+      "clip": {
+        "start": 110,
+        "end": 113
+      },
+      "mainsHz": 60,
+      "followsMains": true,
+      "converted": null,
+      "durationS": 3,
+      "hitS": 1.377,
+      "loudnessLufs": -23,
+      "peakDb": -12.3,
+      "limited": false
+    },
+    "flashover": {
+      "file": "flashover.ogg",
+      "category": "fault",
+      "recording": "fs-367454",
+      "clip": {
+        "start": 0,
+        "end": 2
+      },
+      "mainsHz": 50,
+      "followsMains": true,
+      "converted": {
+        "fromHz": 50,
+        "toHz": 60,
+        "factor": 1.2
+      },
+      "durationS": 1.667,
+      "hitS": 0.071,
+      "loudnessLufs": -17.4,
+      "peakDb": -5.5,
+      "limited": false
+    },
+    "arc": {
+      "file": "arc.ogg",
+      "category": "fault",
+      "recording": "fs-210878",
+      "clip": {
+        "start": 0.6,
+        "end": 2.6
+      },
+      "mainsHz": 60,
+      "followsMains": true,
+      "converted": null,
+      "durationS": 2,
+      "hitS": 0.658,
+      "loudnessLufs": -18,
+      "peakDb": -2.1,
+      "limited": true
+    },
+    "breaker": {
+      "file": "breaker.ogg",
+      "category": "equipment",
+      "recording": "fs-139970",
+      "clip": {
+        "start": 1.25,
+        "end": 2.6
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 1.35,
+      "hitS": 0.154,
+      "loudnessLufs": -23.2,
+      "peakDb": -3.6,
+      "limited": false
+    },
+    "recloser": {
+      "file": "recloser.ogg",
+      "category": "equipment",
+      "recording": "bsb-1092",
+      "clip": {
+        "start": 13.75,
+        "end": 14.3
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 0.547,
+      "hitS": 0.064,
+      "loudnessLufs": -25.4,
+      "peakDb": -1.9,
+      "limited": true
+    },
+    "switch": {
+      "file": "switch.ogg",
+      "category": "equipment",
+      "recording": "bsb-0235",
+      "clip": {
+        "start": 0,
+        "end": 1
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 1,
+      "hitS": 0.082,
+      "loudnessLufs": -23.1,
+      "peakDb": -13.2,
+      "limited": false
+    },
+    "fuse": {
+      "file": "fuse.ogg",
+      "category": "equipment",
+      "recording": "bsb-1092",
+      "clip": {
+        "start": 3.97,
+        "end": 4.4
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 0.449,
+      "hitS": 0.084,
+      "loudnessLufs": -25.5,
+      "peakDb": -1.5,
+      "limited": true
+    },
+    "gate": {
+      "file": "gate.ogg",
+      "category": "ui",
+      "recording": "bsb-2360",
+      "clip": {
+        "start": 0.2,
+        "end": 2.4
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 2.2,
+      "hitS": 0.113,
+      "loudnessLufs": -28.2,
+      "peakDb": -14.6,
+      "limited": false
+    },
+    "relay": {
+      "file": "relay.ogg",
+      "category": "ui",
+      "recording": "bsb-2191",
+      "clip": {
+        "start": 0,
+        "end": 0.084
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 0.081,
+      "hitS": 0.008,
+      "loudnessLufs": -28.3,
+      "peakDb": -5.9,
+      "limited": false
+    },
+    "blast": {
+      "file": "blast.ogg",
+      "category": "fault",
+      "recording": "bsb-1808",
+      "clip": {
+        "start": 0,
+        "end": 0.325
+      },
+      "mainsHz": null,
+      "followsMains": false,
+      "converted": null,
+      "durationS": 0.322,
+      "hitS": 0.01,
+      "loudnessLufs": -22,
+      "peakDb": -1.6,
+      "limited": true
+    }
+  },
+  "credits": [
+    {
+      "id": "bsb-2437",
+      "title": "Electric transformer #4",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/electric-transformer-4-s2437.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "transformer-hum"
+      ],
+      "modified": "transformer-hum: clip 3.5–7 s, sped up ×1.2 (50 → 60 Hz mains), high-passed at 60 Hz, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "fs-809439",
+      "title": "Acoustic Emission from a 500 kV Reactor Bank - Power Substation",
+      "author": "ricardoemfield",
+      "library": "Freesound",
+      "page": "https://freesound.org/people/ricardoemfield/sounds/809439/",
+      "license": "CC-BY-4.0",
+      "slots": [
+        "corona"
+      ],
+      "modified": "corona: clip 110–113 s, mixed to mono, high-passed at 80 Hz, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "fs-367454",
+      "title": "Flashover discharge 280KV.wav",
+      "author": "jensfelger",
+      "library": "Freesound",
+      "page": "https://freesound.org/people/jensfelger/sounds/367454/",
+      "license": "CC0-1.0",
+      "slots": [
+        "flashover"
+      ],
+      "modified": "flashover: clip 0–2 s, mixed to mono, sped up ×1.2 (50 → 60 Hz mains), high-passed at 40 Hz, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "fs-210878",
+      "title": "highvoltagearc.wav",
+      "author": "Sclolex",
+      "library": "Freesound",
+      "page": "https://freesound.org/people/Sclolex/sounds/210878/",
+      "license": "CC0-1.0",
+      "slots": [
+        "arc"
+      ],
+      "modified": "arc: clip 0.6–2.6 s, mixed to mono, high-passed at 40 Hz, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "fs-139970",
+      "title": "Switch.Big.Power.wav",
+      "author": "jessepash",
+      "library": "Freesound",
+      "page": "https://freesound.org/people/jessepash/sounds/139970/",
+      "license": "CC0-1.0",
+      "slots": [
+        "breaker"
+      ],
+      "modified": "breaker: clip 1.25–2.6 s, mixed to mono, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "bsb-1092",
+      "title": "Electric circuit breaker",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/electric-circuit-breaker-s1092.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "recloser",
+        "fuse"
+      ],
+      "modified": "recloser: clip 13.75–14.3 s, faded, loudness-normalized, Ogg Vorbis; fuse: clip 3.97–4.4 s, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "bsb-0235",
+      "title": "Iron bar falls #2",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/iron-bar-falls-2-s0235.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "switch"
+      ],
+      "modified": "switch: clip 0–1 s, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "bsb-2360",
+      "title": "Metal barrier: Closure #3",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/grinding-metal-barrier-closure-3-s2360.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "gate"
+      ],
+      "modified": "gate: clip 0.2–2.4 s, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "bsb-2191",
+      "title": "Thermostat #1",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/thermostat-1-s2191.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "relay"
+      ],
+      "modified": "relay: clip 0–0.084 s, faded, loudness-normalized, Ogg Vorbis"
+    },
+    {
+      "id": "bsb-1808",
+      "title": "Explosion #2",
+      "author": "Joseph Sardin",
+      "library": "BigSoundBank",
+      "page": "https://bigsoundbank.com/explosion-2-s1808.html",
+      "license": "CC0-1.0",
+      "slots": [
+        "blast"
+      ],
+      "modified": "blast: clip 0–0.325 s, faded, loudness-normalized, Ogg Vorbis"
+    }
+  ]
+}

@@ -155,6 +155,10 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 .tutorial h4 { margin: 0 0 .35em; color: var(--accent); }
 .tutorial p { margin: 0 0 .6em; font-size: .9em; }
 .tutorial-pending { margin: 0 0 .6em; }
+.fault-caption { margin-top: .5em; max-width: 640px; font-size: .9em; color: var(--major); }
+.tutorial { max-height: calc(100% - 100px); overflow-y: auto; }
+.tutorial .help-diagram svg { max-width: 260px; }
+.tutorial .help-diagram figcaption { display: none; }
 .tutorial-pending ul { margin: .2em 0 0; padding-left: 1.2em; font-size: .88em; color: var(--major); }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: .55em 1em; border-radius: 8px; z-index: 60; }
 .toast.warn { border-color: var(--major); }

@@ -130,6 +130,32 @@ const DIAGRAMS: Record<HelpDiagramId, { caption: string; svg: () => JSX.Element 
       </>
     ),
   },
+  'bus-regulation': {
+    caption: 'Bus regulation: regulators connected right at the transformer low-voltage terminal, with the station bus on their far side, so every feeder gets regulated voltage. Feeder regulation puts a bank in each bay instead.',
+    svg: () => (
+      <>
+        <Line pts={[[4, 46], [12, 46]]} color={C.hv} />
+        <Xfmr x={12} y={46} />
+        <Line pts={[[41, 46], [66, 46]]} />
+        <g fill="none" stroke={C.no} stroke-width={2}>
+          <circle cx={75} cy={46} r={9} />
+          <path d="M69 52 L81 40 M77 40 h4 v4" />
+        </g>
+        <Line pts={[[84, 46], [116, 46]]} />
+        <Line pts={[[116, 14], [116, 78]]} w={4} />
+        {[22, 46, 70].map((y) => (
+          <g key={y}>
+            <Line pts={[[116, y], [170, y]]} />
+            <Exit x={170} y={y} />
+          </g>
+        ))}
+        <Label x={26} y={72} t="transformer" />
+        <Label x={75} y={28} t="regulators" color={C.no} />
+        <Label x={116} y={90} t="station bus" />
+        <Label x={146} y={16} t="feeders" />
+      </>
+    ),
+  },
   'xfmr-primary': {
     caption: 'Transformer primary: a disconnect switch, then a protective device (fuses, or a circuit switcher or breaker with relays), then the transformer.',
     svg: () => (

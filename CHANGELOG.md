@@ -6,6 +6,51 @@ builds attached on the [GitHub Releases page](https://github.com/geographybuff/s
 
 ## [Unreleased]
 
+### Added
+- Sound. Each piece of equipment plays about two seconds of its normal operating sound as you place
+  it: transformers and regulators hum at 120 Hz (twice the 60 Hz system frequency) with harmonics,
+  louder for bigger transformers and with fan noise when forced-air cooled; regulators change tap;
+  breakers charge their spring and close; reclosers clack; disconnect switches swing shut; buses,
+  fences and erasing have their own short sounds.
+- Energizing a design you can hear: a sound design closes in switch by switch and the transformer
+  hums up. Energizing one with critical findings turns its worst physical failure into an arcing
+  fault at that circuit's own voltage and fault current: equipment or bus rated below the bus voltage
+  flashes over, too-small clearances flash over between phases or to ground, a device that cannot
+  interrupt the fault fails, and an unprotected transformer faults internally. The arc pulses at
+  every current zero and lasts as long as the device that would really clear it takes: power fuses
+  blow in about two cycles, a recloser trips, recloses onto the fault and trips again, a breaker
+  trips in about seven cycles, and with nothing in the station the arc burns until the far end of
+  the line trips (and the transformer tank ruptures). The Results screen says what you heard and can
+  replay it.
+- Real recordings layered over the synthesized sounds: a high-voltage transformer's hum, corona from
+  a 500 kV substation, a 280 kV flashover, a 20 kV power arc, a large three-phase switch, a service
+  breaker tripping and latching, a steel blade seating, a gate for the fence. Each clip lines up with
+  the event it accompanies (the breaker's close, each arc's ignition and each trip). Recordings made on
+  50 Hz power are sped up to 60 Hz so every hum and arc pulses at 120 Hz like North American equipment.
+- Every sound, synthesized or recorded, is set to one loudness scale (ITU-R BS.1770): placing any
+  piece of equipment sounds about as loud as any other, a big transformer or arc is only a little
+  louder than a small one, and a fault is louder than equipment but never startling.
+- Settings → Audio: sound on or off, and volume. The Credits screen lists each recording with a link
+  to its page.
+
+### Changed
+- Tutorial: a step that asks for one voltage now highlights only that toolbox entry (First Light's
+  primary disconnect switch pulses the 69 kV entry, not the 12.47 kV one).
+- Keep the Lights On tutorial: the voltage regulation step finishes as soon as bus regulators are
+  connected to the transformer's low-voltage terminal (or the transformer has a load tap changer),
+  without waiting for the feeder bays. It shows a one-line diagram of bus regulation.
+- Recloser bypass steps (Keep the Lights On, Mobile Ready) explain that the bypass runs alongside
+  the bay, show the bypass diagram, and list what is still missing bay by bay: feeders without a
+  recloser, hook stick switches wired in series with a feeder or left closed, and reclosers with no
+  bypass yet.
+
+### Fixed
+- 3D view: every rigid bus now stands on bus supports. Short buses between two pieces of equipment
+  (such as transformer to regulator) no longer float in mid-air; a bus that ends at equipment has a
+  support just behind its end, with the flexible jumpers hanging from there.
+- 3D view: where buses meet, the supports stand the same distance either side of the junction, on
+  the upper bus and on the bus that taps or crosses beneath it, clear of the other bus's phases.
+
 ## [0.4.0] - 2026-11-22
 
 ### Added

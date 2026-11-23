@@ -115,6 +115,21 @@ export function Settings() {
             </label>
             <Toggle label="Reduce motion" desc="No camera easing, flashes or animations" checked={g.reduceMotion} onChange={(v) => setGraphics({ ...g, reduceMotion: v })} />
             <Toggle label="Show tips" desc="&quot;Help me fix this&quot; and Show me in the campaign Review tab" checked={game.showTips} onChange={(v) => setGame({ ...game, showTips: v })} />
+            <h3 style={{ marginTop: '1em' }}>Audio</h3>
+            <Toggle
+              label="Sound"
+              desc="Each piece of equipment's operating sound as you place it, and what energizing your design sounds like, arcing faults included"
+              checked={game.sound}
+              onChange={(v) => setGame({ ...game, sound: v })}
+              testid="toggle-sound"
+            />
+            <label class="toggle">
+              <span>
+                Volume
+                <div class="desc">{Math.round(game.volume * 100)}%</div>
+              </span>
+              <input type="range" min={0} max={1} step={0.05} value={game.volume} disabled={!game.sound} onInput={(e) => setGame({ ...game, volume: Number((e.target as HTMLInputElement).value) })} data-testid="volume" />
+            </label>
             <h3 style={{ marginTop: '1em' }}>Progress</h3>
             <button
               class="btn danger"
