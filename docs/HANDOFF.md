@@ -42,20 +42,18 @@ Compact status notes so work can resume quickly (e.g. after a usage-limit reset)
   Dev: `view3d-harness.html?scenario=/tests/dev/scenarios.ts&v=<name>` renders junction variants or `sol:<levelId>`.
 - **Desktop/release**: `electron/main.cjs` + `preload.cjs`, `electron-builder.yml` (NSIS with license page,
   portable, zip), `scripts/` (icon, prepare-build, verify-release, release-notes), `.github/workflows/`
-  (`ci.yml`; `release.yml` triggered by pushing a `v*` tag).
+  (`ci.yml`; `tag-release.yml`, run by hand, which calls `release.yml`; `release.yml` also runs on a pushed `v*` tag).
 - **Tests**: `npm test` (vitest), `node e2e/smoke.mjs dist` and `node e2e/smoke.mjs dist-web/index.html`
   (license gate + gameplay), `xvfb-run -a node e2e/electron-smoke.mjs` (desktop shell).
 
 ## Releases / tags
-- The development session cannot push tags (git proxy returns 403 for refs other than the working branch).
-  The repository owner creates tags: `git tag -a vX.Y.Z <commit> -m "..." && git push origin vX.Y.Z`.
-  The release workflow then builds and publishes. Planned tags are listed in CHANGELOG.md.
-
-## Planned tags (create from the repo owner's machine)
-- v0.1.0 → commit 2da59f1 (first playable). v0.2.0 → 3214868 ("Finalize 0.2.0 changelog").
-- v0.3.0 → 2002786 ("Release 0.3.0": ring bus, altitude, standard recloser ratings, arrester MCOV).
-- v0.4.0 → the "Release 0.4.0" commit on the `claude/sleepy-newton-26ko2v` branch once its PR is merged
-  (campaign help, tutorials for every project, bus junction and terminal-entry fixes).
+- The development session cannot push tags (git proxy returns 403 for refs other than the working branch),
+  and no longer needs to: after the release PR is merged, run the **Tag release** workflow on `main` with the
+  version. It checks package.json, package-lock.json and CHANGELOG.md, builds everything, tags `vX.Y.Z` once
+  the builds pass and publishes the release. Steps are in `CLAUDE.md` → Releasing.
+- Released: v0.1.0 (2da59f1), v0.2.0 (3214868), v0.3.0 (2002786), tagged by hand.
+- Next: v0.4.0 is merged to `main` (137099c) but not tagged yet. Run Tag release with `0.4.0` once the
+  tag-release workflow is on `main`.
 
 ## TODO (in priority order)
 1. Self-audit facts vs bulletin (continue the log below; Table 5-60 not yet re-read against page text); playtest all eight projects in the browser and the Windows build.

@@ -20,6 +20,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Version and changelog agree
+        run: node scripts/check-release.mjs
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
